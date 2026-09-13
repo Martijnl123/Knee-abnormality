@@ -53,6 +53,35 @@ ARTIFACTS_DATASET = f"{ACCOUNT}/knee-phase1-artifacts"
 FUSED_DATASET = f"{ACCOUNT}/knee-phase1-fused"
 PUBLIC_DATASET = f"{ACCOUNT}/knee-phase1-public"
 DISTILLED_DATASET = f"{ACCOUNT}/knee-phase1-distilled"
+# THE TWO ARMS OF E104, AND WHY THERE ARE TWO.
+#
+# `dreaddevelopment/rsna-knee-labels` (CC0) carries soft labels for 4,349
+# studies -- every study except EXACTLY the 58 gold, verified as a set identity
+# in E088. E089 scored the public label sets against gold and recorded this one
+# as "unscoreable": zero overlap, so the labels cannot be compared to the expert
+# values at all. That is true of the LABELS and it is where the log stopped.
+#
+# It is not true of a MODEL TRAINED ON THEM. A label set that excludes the gold
+# by construction means a model trained on all of it has never seen a gold
+# study, so gold-58 is a clean holdout for a model fitted on 98.7% of the
+# corpus. This project has never had that: the 5-fold lineage is honest but each
+# member misses a fifth of the data, and the full-fit lineage sees everything and
+# cannot be scored at all (E083, and `knee-infer-v1pubfull5`'s own note).
+#
+# DREAD is that arm. PUB4349 is its control: the incumbent `stevenleehans`
+# labels restricted to the SAME 4,349 studies, so the studies, the architecture,
+# the geometry, the epochs and the seed are all identical and the label source
+# is the only difference. Both parquets are structurally identical -- the
+# incumbent's channel and weight columns are constants (`asserted` / 1.0 across
+# all 52,884 cells), so they were copied and only the values differ.
+#
+# The two sets share NO cell value (0.0% identical) and their per-finding
+# Spearman runs 0.52 to 0.945, lowest on **Synovitis (0.520)** and Fracture
+# (0.609). Synovitis is this project's floor since E059 and the weakest finding
+# in the CoAtNet blend (0.809), so the label sets disagree most exactly where
+# there is the most to win.
+DREAD_DATASET = f"{ACCOUNT}/knee-phase1-dread"
+PUB4349_DATASET = f"{ACCOUNT}/knee-phase1-pub4349"
 """Publicly shared LLM report labels, repackaged into this pipeline's schema.
 
 NOT this project's labels. Source: `stevenleehans/rsna-knee-llm-report-labels`,
@@ -1692,6 +1721,46 @@ EXTRAS = [
              "project never checked.\n"
              "\n"
              "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    Kernel(
+        slug="knee-train-lab-dread",
+        directory="88_train_lab_dread",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[DREAD_DATASET],
+        # RUN_FOLD=-1 is a full fit, and here it costs nothing in honesty: the
+        # label set has no gold rows, so `build_cohort` finds no gold study to
+        # put in `studies` at all and the 58 stay outside training whatever this
+        # is set to. The log will read "gold studies in cache: 0", which is the
+        # tell that the holdout is real.
+        constants={"RUN_FOLD": -1,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, seed=3).constants()},
+        note="ARM A of the first label comparison this project has measured on a\nMODEL rather than on the labels themselves.\n\nTrains the 0.923 configuration on `dreaddevelopment`'s CC0 soft\nlabels over 4,349 studies - every study except exactly the 58\ngold. So this is a FULL FIT that is still honestly scoreable: the\n58 are outside the training set by construction, not by a split.\n\nE089 called this label set unscoreable and it is, as LABELS. The\nmodel trained on them is not, and that is the whole point.\n\nIts authors' own headline for these labels is +0.013 AUC (E088),\nself-reported. This measures it.\n\nONE VARIABLE. `knee-train-lab-pub4349` is the control: same 4,349\nstudies, same resnet34, same 192px/0.6mm geometry, same 24 epochs,\nsame batch, same LR, same seed 3. Only the label source differs.\n\nATTRIBUTION: labels from `dreaddevelopment/rsna-knee-labels`,\nCC0-1.0, repackaged into this pipeline's schema with credit.",
+    ),
+    Kernel(
+        slug="knee-train-lab-pub4349",
+        directory="89_train_lab_pub4349",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUB4349_DATASET],
+        # RUN_FOLD=-1 is a full fit, and here it costs nothing in honesty: the
+        # label set has no gold rows, so `build_cohort` finds no gold study to
+        # put in `studies` at all and the 58 stay outside training whatever this
+        # is set to. The log will read "gold studies in cache: 0", which is the
+        # tell that the holdout is real.
+        constants={"RUN_FOLD": -1,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, seed=3).constants()},
+        note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
     ),
     # TWELVE ARMS FROM THREE FILES, TO PRICE TTA THE WAY E101 PRICED PARTNERS.
     #

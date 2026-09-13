@@ -5970,3 +5970,90 @@ resolve the difference.
 - **cost**: one free run, ~9 build groups over 58 studies. No submission, no new
   asset, no training. **This is the fourth entry in three days where the E099
   instrument replaced a board submission with arithmetic.**
+
+
+### E104 — PRE-REGISTERED, NOT YET RUN: the label set E089 called unscoreable, measured on a model instead
+- **date**: 2026-09-13, written **before** the run. Two full-fit trainers,
+  ~1.4 GPU-h each. Written after the weekly quota reopened and a teammate joined,
+  adding ~30 h. **No submission.**
+
+**WHAT E089 GOT RIGHT AND WHERE IT STOPPED.** E089 scored three public label sets
+against the 58 gold and closed the label route: none beats the incumbent
+`stevenleehans` at 0.8927. But one candidate came back **unscoreable** rather
+than behind — `dreaddevelopment/rsna-knee-labels`, 4,349 studies, **zero overlap
+with gold** because it is every study except exactly the 58 (verified as a set
+identity in E088, re-verified here). E089 recorded that and stopped.
+
+**THE THING THAT MAKES IT WORTH GPU IS THE PROPERTY THAT MADE IT UNSCOREABLE.**
+A label set with no gold rows means a model trained on **all** of it has never
+seen a gold study. So **gold-58 is a clean holdout for a model fitted on 98.7% of
+the corpus** — which this project has never had:
+
+| lineage | data each member sees | gold-58 |
+|---|---|---|
+| `v1public` 5-fold | 80% of the corpus, misses ~12 gold each | honest, **0.8980** |
+| `v1pubfull5` full fit | 100%, **including all 58 gold** | **cannot be scored at all** |
+| **this** | **98.7%, and no gold, ever** | **honest** |
+
+  The unscoreable labels buy a scoreable model. That is the entry.
+
+**AND THE AUTHORS CLAIM IT IS THE BIGGEST LEVER THEY HAVE.** E088 recorded the
+0.937 write-up's own headline: soft labels from LLM-parsed reports, **+0.013
+AUC**, expanding training to 4,349 studies — *"Better labels > bigger models."*
+Self-reported, on their split, with their architecture. **Nothing in this log has
+tested it.**
+
+**ONE VARIABLE, WITH THE CONTROL BUILT FIRST.**
+
+| | arm A `knee-train-lab-dread` | arm B `knee-train-lab-pub4349` |
+|---|---|---|
+| studies | the same 4,349 | the same 4,349 |
+| labels | `dreaddevelopment`, CC0 | `stevenleehans`, the incumbent |
+| everything else | resnet34, 192 px / 0.6 mm, 24 epochs, batch 16, LR 6e-4, seed 3 | identical |
+
+  **Arm B is not optional.** Without it the comparison would be against
+  `v1public`'s 0.8980, which is a five-fold out-of-fold number from models that
+  each saw 80% of the corpus — reading a full-fit arm against that confounds the
+  label change with the data change. **E060 is in this log because a claim was
+  made without a control arm**, and E089's own screen needed one before it could
+  be trusted. Arm B is also worth having alone: the incumbent labels have never
+  been measured at full corpus with an honest holdout.
+
+**THE TWO SETS ARE GENUINELY DIFFERENT, AND DIFFERENT WHERE IT PAYS.** Not one of
+the 52,188 cells matches (**0.0% identical**); per-finding Spearman runs 0.52 to
+0.945:
+
+```
+Synovitis 0.520   Fracture 0.609   Contusion 0.754   MCL 0.784   Baker's 0.789
+ACL 0.840   Lateral Meniscus 0.825   Lateral OA 0.906   Medial Meniscus 0.909
+Effusion 0.920   Medial OA 0.932   PF OA 0.945
+```
+
+  **They disagree most on Synovitis** — this project's floor since E059, and the
+  weakest finding in the CoAtNet blend at **0.809** (E101). The macro weights all
+  twelve equally, so the finding with the most headroom is exactly the one the
+  two labelers most disagree about.
+
+**THE ACCEPTANCE RULES, FIXED NOW.**
+
+1. **A ≥ B + 0.015** → the label set is a real upgrade and the 5-seed build is
+   worth ~7 GPU-h of the remaining quota.
+2. **|A − B| < 0.015** → not separated on this instrument. E031 puts gold-58's
+   absolute interval at ±0.0153, so anything smaller is inside it and **will be
+   reported as not separated, not as a tie broken by the point estimate.**
+3. **A < B − 0.015** → `dreaddevelopment`'s labels are worse, upstream's +0.013
+   does not transfer to this architecture, and the label route closes for the
+   fourth time, now on a model rather than a proxy.
+4. **Either arm below 0.87** → the 4,349-study restriction itself costs more than
+   the labels buy, and both readings are about the data change instead. The
+   control is what makes this distinguishable.
+5. **Whatever wins, it is not shipped on its own number.** The v1 arm's value is
+   what it adds to the CoAtNet blend, and E101 measured that at **+0.0053 from a
+   0.0243 gap**. The blend is re-swept offline against the E099 dump before any
+   submission is spent.
+
+**WHY THIS AND NOT ARCHITECTURE, with 30 h now available.** The standing
+constraint holds and the log agrees with it: labels and data account for +0.166
+of this project's +0.198, and every architecture lever measured zero, negative,
+or inside E060's noise floor. **This is a data lever priced at 2.8 GPU-h with an
+honest holdout, which is the cheapest well-posed question left.**
