@@ -200,3 +200,93 @@ def test_the_gold_split_refuses_a_single_class_finding():
     src = GENERATED.read_text()
     i = src.index("degenerate = [f for k, f in enumerate(LAB)")
     assert "raise RuntimeError" in src[i:i + 400]
+
+
+# --------------------------------------------------------------------------- #
+# Test-time augmentation (E103)
+# --------------------------------------------------------------------------- #
+TTA_SLUG = "knee-gold-raptortta"
+
+
+def _tta_arms():
+    return _kernel(TTA_SLUG).constants["ARMS"]
+
+
+def test_every_tta_arm_reuses_a_checkpoint_that_is_already_mounted():
+    """The whole premise is that no new asset is needed. A variant pointing at a
+    fourth file would be a different experiment wearing this one's name."""
+    published = {a["file"] for a in _kernel("knee-infer-raptorcc0x4").constants["ARMS"]}
+    assert {a["file"] for a in _tta_arms()} == published
+    assert len(published) == 3
+
+
+def test_the_four_published_arms_are_carried_unchanged_as_the_control():
+    """E039's rule: the control comes first and it must be the real thing. If the
+    published four do not reproduce their known gold numbers in this run, nothing
+    else in it is readable."""
+    tta = {a["name"]: a for a in _tta_arms()}
+    for arm in _kernel("knee-infer-raptorcc0x4").constants["ARMS"]:
+        here = tta[arm["name"]]
+        for key in ("file", "img", "slots", "span", "k_eval", "reverse", "expect_gold"):
+            assert here[key] == arm[key], f"{arm['name']} differs in {key}"
+
+
+def test_no_arm_is_a_horizontal_flip():
+    """A true left-right mirror is not merely a distribution shift for this label
+    set, it is wrong: Medial/Lateral Meniscus and Medial/Lateral OA are four of
+    the twelve findings, and medial versus lateral is which SIDE of the knee a
+    structure is on. Mirroring a left knee makes it a right knee and swaps them.
+
+    `reverse` is the slice-triplet reversal — `flip(1)` on (K, 3, H, W) — and the
+    template must never grow a `flip(-1)` beside it."""
+    src = (REPO_ROOT / "kaggle" / "87_gold_raptortta" / "run.py").read_text()
+    # Comments stripped first: the template EXPLAINS the mirror it does not do,
+    # and that paragraph is the reason the distinction survived at all.
+    code = "\n".join(line.split("#", 1)[0] for line in src.splitlines())
+    assert "flip(-1)" not in code and "flip(3)" not in code
+    assert "xwins.flip(1)" in code
+    assert all(set(a) >= {"reverse"} and isinstance(a["reverse"], bool) for a in _tta_arms())
+
+
+def test_the_span_jitter_step_is_upstreams_own_and_not_a_fitted_number():
+    """v5 and v10 span (0.02, 0.98); v8 spans (0.06, 0.94). The published arms
+    differ by exactly 0.04 at each end, so 0.04 and 0.08 are upstream's step and
+    twice it. A step chosen by looking at a gold score would be a free parameter
+    fitted to 58 studies."""
+    by_name = {a["name"]: a for a in _tta_arms()}
+    for parent, step in (("maxspan-v5", 0.04), ("maxspan-v5", 0.08),
+                         ("native384dense-v10", 0.04), ("native384dense-v10", 0.08),
+                         ("native384-v8", 0.04), ("native384-v8", 0.08)):
+        lo, hi = by_name[parent]["span"]
+        child = by_name[f"{parent}-span{int(step * 100):02d}"]["span"]
+        assert child == (round(lo + step, 2), round(hi - step, 2)), child
+        assert child[0] < child[1]
+
+
+def test_every_variant_keeps_its_parents_geometry_apart_from_the_one_axis():
+    """One variable at a time. A span variant that also changed `img` would make
+    the axis unreadable, which is the bug E088 caught when all four arms shared
+    one geometry."""
+    by_name = {a["name"]: a for a in _tta_arms()}
+    for name, arm in by_name.items():
+        parent = name.split("-span")[0].removesuffix("-reverse")
+        if parent == name:
+            continue
+        p = by_name[parent]
+        for key in ("file", "img", "slots", "k_eval", "expect_gold"):
+            assert arm[key] == p[key], f"{name} changed {key} as well"
+        changed = [k for k in ("span", "reverse") if arm[k] != p[k]]
+        assert len(changed) == 1, f"{name} changes {changed}, expected exactly one"
+
+
+def test_the_reverse_axis_covers_the_two_checkpoints_upstream_left_out():
+    names = {a["name"] for a in _tta_arms()}
+    assert {"native384dense-v10-reverse", "native384-v8-reverse"} <= names
+    assert "maxspan-v5-reverse" in names, "upstream's own reverse must stay as the control"
+
+
+def test_the_tta_weights_are_flat_because_the_blend_is_searched_offline():
+    """A weighted blend here would be a result nobody asked for. The dump is the
+    deliverable; the kernel's own blend line is a flat average."""
+    assert {a["w"] for a in _tta_arms()} == {1.0}
+    assert _kernel(TTA_SLUG).constants["MEMBERS_EXPECTED"] == len(_tta_arms()) == 12

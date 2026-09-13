@@ -40,7 +40,7 @@ USABLE_PREFIXES = ("CC0", "Apache")
 # expert studies, so every guard here applies to it unchanged. Leaving it out
 # would be the one place the licence and geometry checks stop.
 RAPTOR_SLUGS = ("knee-infer-raptorcc0", "knee-infer-raptorcc0x4",
-                "knee-gold-raptorcc0x4")
+                "knee-gold-raptorcc0x4", "knee-gold-raptortta")
 
 
 def _kernel(slug):

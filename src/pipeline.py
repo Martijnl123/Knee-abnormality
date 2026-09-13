@@ -394,6 +394,80 @@ RAPTOR_ARMS = (
      "k_eval": 42, "reverse": False, "w": 0.20, "expect_gold": 0.9067},
 )
 
+# TEST-TIME AUGMENTATION FROM THE CHECKPOINTS ALREADY MOUNTED (E103).
+#
+# Two axes, and the point of both is that they introduce NO new asset, NO new
+# training and NO hyperparameter chosen on the 58 gold studies.
+#
+# AXIS 1 -- REVERSE THE OTHER TWO CHECKPOINTS. Upstream publishes four arms and
+# exactly one of them is a transform rather than a file: `maxspan-v5-reverse`,
+# the same weights with the three-slice triplet reversed. They never applied it
+# to `native384-v8` or `native384dense-v10`. Applying it there adds two members
+# for two extra forward passes on a volume that is already built -- the template
+# groups by preprocessing signature, so a reverse member costs one forward and
+# not a second pass. Zero new hyperparameters: the mechanism is upstream's own
+# and it is already in the blend that scored 0.932.
+#
+# AXIS 2 -- JITTER THE SPAN. `span` selects which slices of each source series
+# fill the stack: `lo, hi = int(n * span_lo), int(n * span_hi) - 1`, then k of
+# them evenly. Changing it resamples the volume from different source slices,
+# which is ordinary multi-crop TTA along the slice axis.
+#
+#   THE JITTER MAGNITUDE IS TAKEN FROM UPSTREAM, NOT FROM GOLD. v5 and v10 span
+#   (0.02, 0.98); v8 spans (0.06, 0.94). The authors' own arms differ by exactly
+#   0.04 at each end, so 0.04 and 0.08 are their step and twice their step. No
+#   number here was chosen by looking at a score.
+#
+# WHAT IS DELIBERATELY ABSENT: a horizontal flip. Upstream's prose calls their
+# reverse member one and the template's comment already records that the code
+# does something else. A true left-right mirror is not merely a distribution
+# shift here, it is WRONG FOR THIS LABEL SET: four of the twelve findings are
+# Medial/Lateral Meniscus and Medial/Lateral OA, and medial versus lateral is
+# which SIDE of the knee a structure sits on. Mirroring a left knee turns it
+# into a right knee and swaps medial with lateral, so those four findings would
+# be read off the wrong compartment. That is presumably why upstream's transform
+# is a slice reversal and not a mirror.
+#
+# ALSO ABSENT: varying `k_eval`. `_eval_centers` takes `k` points evenly over
+# the interior of the filled mask, and v5 already asks for 62 of at most 62. It
+# is not subsampling, so a smaller k removes information and a larger one
+# duplicates slices. There is no resampling diversity on that axis to have.
+
+
+def _span(lo, hi, step):
+    return (round(lo + step, 2), round(hi - step, 2))
+
+
+def _variant(arm, name, span=None, reverse=None):
+    return {**arm, "name": name,
+            "span": arm["span"] if span is None else span,
+            "reverse": arm["reverse"] if reverse is None else reverse,
+            # Flat weights: this manifest exists to DUMP per-arm probabilities,
+            # and the blend weights are searched offline afterwards. The kernel's
+            # own blend line is a flat average and is not the thing under test.
+            "w": 1.0}
+
+
+_V10 = RAPTOR_ARMS[1]
+_V8 = RAPTOR_ARMS[3]
+RAPTOR_TTA_ARMS = (
+    # the four published arms, unchanged, so the sweep has its own control
+    _variant(RAPTOR_V5, "maxspan-v5"),
+    _variant(_V10, "native384dense-v10"),
+    _variant(RAPTOR_V5, "maxspan-v5-reverse", reverse=True),
+    _variant(_V8, "native384-v8"),
+    # axis 1: upstream's own transform, applied to the two files they left out
+    _variant(_V10, "native384dense-v10-reverse", reverse=True),
+    _variant(_V8, "native384-v8-reverse", reverse=True),
+    # axis 2: one step and two steps inward, at upstream's own step size
+    _variant(RAPTOR_V5, "maxspan-v5-span04", span=_span(0.02, 0.98, 0.04)),
+    _variant(RAPTOR_V5, "maxspan-v5-span08", span=_span(0.02, 0.98, 0.08)),
+    _variant(_V10, "native384dense-v10-span04", span=_span(0.02, 0.98, 0.04)),
+    _variant(_V10, "native384dense-v10-span08", span=_span(0.02, 0.98, 0.08)),
+    _variant(_V8, "native384-v8-span04", span=_span(0.06, 0.94, 0.04)),
+    _variant(_V8, "native384-v8-span08", span=_span(0.06, 0.94, 0.08)),
+)
+
 V1 = Geometry(
     mm_per_pixel=0.6, size=192, slices=20,
     note="0.6 mm/px over 192 px covers ~115 mm, which contains the knee joint\n"
@@ -1616,6 +1690,69 @@ EXTRAS = [
              "maxspan-v5 does not land near 0.9214 the self-reports do not\n"
              "transfer and E097's +0.004 was bought on a premise this\n"
              "project never checked.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    # TWELVE ARMS FROM THREE FILES, TO PRICE TTA THE WAY E101 PRICED PARTNERS.
+    #
+    # E099's instrument turned "what blend?" from a board submission into
+    # arithmetic, and E101 spent it on eight candidate PARTNERS. This spends it
+    # on the arms themselves: the three mounted checkpoints can produce more
+    # members than upstream published, and nobody has checked whether the extra
+    # ones are diverse enough to pay.
+    #
+    # The four published arms are included unchanged, so the sweep carries its
+    # own control and must reproduce 0.9198 / 0.9170 / 0.9167 / 0.9116 for a
+    # fourth consecutive run before anything else in it is readable.
+    #
+    # NOTHING IS SELECTED ON GOLD. The acceptance rule is fixed in E103 before
+    # the run: each axis is taken WHOLE or not at all, at flat weight within its
+    # checkpoint family. Picking the variants that happened to score well on 58
+    # studies is fitting 12 free parameters to 58 studies, which this project has
+    # declined five times.
+    Kernel(
+        slug="knee-gold-raptortta",
+        directory="87_gold_raptortta",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 12,
+            "ARMS": RAPTOR_TTA_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. Twelve arms from the same three CC0\n"
+             "checkpoints, scored on the 58 expert studies, dumping raw\n"
+             "per-study probabilities so TTA can be priced offline.\n"
+             "\n"
+             "AXIS 1: upstream publishes ONE transform arm - maxspan-v5 with\n"
+             "its slice triplet reversed - and never applies it to the other\n"
+             "two files. This does. Two extra members for two extra forward\n"
+             "passes on volumes already built.\n"
+             "\n"
+             "AXIS 2: span jitter. `span` picks which source slices fill the\n"
+             "stack, so shifting it resamples the volume. The step is 0.04,\n"
+             "which is the gap between upstream's OWN spans (v5 and v10 at\n"
+             "0.02-0.98, v8 at 0.06-0.94) - taken from their choices, not\n"
+             "from a score.\n"
+             "\n"
+             "NO HORIZONTAL FLIP, on purpose. Four of the twelve findings\n"
+             "are Medial/Lateral Meniscus and Medial/Lateral OA, and medial\n"
+             "versus lateral is which SIDE of the knee a structure sits on.\n"
+             "Mirroring a left knee makes it a right knee and swaps the two,\n"
+             "so those four would be read off the wrong compartment.\n"
+             "\n"
+             "Weights are flat because the blend is searched offline; the\n"
+             "kernel's own blend line is a flat average, not the result.\n"
              "\n"
              "ATTRIBUTION: as `knee-infer-raptorcc0`.",
     ),

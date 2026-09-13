@@ -5894,3 +5894,79 @@ v1 members 5 | distinct weight fingerprints 5 | [-7.2595, -7.4884, -6.3623, -3.9
   could not have told the difference, and now it can. Recorded that way rather
   than as a catch, because a guard that never fired is not evidence of anything
   it prevented.
+
+
+### E103 — PRE-REGISTERED, NOT YET RUN: the mounted checkpoints can make more members than upstream published
+- **date**: 2026-09-13, written **before** the run. `knee-gold-raptortta`, 12 arms
+  from **3 files already mounted**. No new asset, no training, **no submission**.
+
+**THE LEVER.** Every route out of 0.932 that needed something new is closed:
+foreign models by quality (E098, E101), public labels by measurement (E089),
+RadImageNet by both (E100), architecture by the standing constraint. What has
+never been asked is whether the three CC0 checkpoints already in the submission
+can produce **more members than their authors shipped**.
+
+**AXIS 1 — REVERSE THE TWO FILES UPSTREAM LEFT OUT.** Of the four published arms,
+exactly one is a transform rather than a file: `maxspan-v5-reverse`, the same
+weights with the three-slice triplet reversed. **They never applied it to
+`native384-v8` or `native384dense-v10`.** Two extra members, two extra forward
+passes on volumes already built — the template groups by preprocessing signature,
+so a reverse member costs one forward and not a second pass. **Zero new
+hyperparameters**: the mechanism is upstream's own and is already inside the
+blend that scored 0.932.
+
+**AXIS 2 — JITTER THE SPAN.** `span` decides which slices of each source series
+fill the stack (`lo, hi = int(n * span_lo), int(n * span_hi) - 1`, then k evenly
+between). Shifting it resamples from different source slices: ordinary multi-crop
+TTA along the slice axis.
+
+- **the step is upstream's, not gold's.** v5 and v10 span (0.02, 0.98); v8 spans
+  (0.06, 0.94). **The published arms differ by exactly 0.04 at each end**, so
+  0.04 and 0.08 are their step and twice their step. No number in this entry was
+  chosen by looking at a score.
+
+**TWO THINGS DELIBERATELY ABSENT, AND THE REASONS ARE THE USEFUL PART.**
+
+1. **No horizontal flip.** Upstream's prose calls their reverse member one and
+   E088 already recorded that the code does something else. A true mirror is not
+   merely a distribution shift here — **it is wrong for this label set.** Four of
+   the twelve findings are **Medial/Lateral Meniscus and Medial/Lateral OA**, and
+   medial versus lateral is *which side of the knee a structure sits on*.
+   Mirroring a left knee makes it a right knee and **swaps medial with lateral**,
+   so those four findings would be read off the wrong compartment. That is
+   presumably why upstream's transform is a slice reversal.
+2. **No varying `k_eval`.** `_eval_centers` takes k points evenly over the
+   interior of the filled mask, and **v5 already asks for 62 of at most 62**. It
+   is not subsampling. A smaller k removes information; a larger one duplicates
+   slices. **There is no resampling diversity on that axis to have** — worth
+   writing down, because it is the first TTA knob anyone would reach for.
+
+**THE ACCEPTANCE RULES, FIXED NOW.**
+
+1. **The control must reproduce.** The four published arms are carried unchanged
+   and must read **0.9198 / 0.9170 / 0.9167 / 0.9116** for a fourth consecutive
+   run. If they move, the run measured something else and nothing in it is read.
+2. **Each axis is taken WHOLE or not at all**, at flat weight within its
+   checkpoint family. **Picking the variants that happened to score well on 58
+   studies is fitting free parameters to 58 studies**, which this log has declined
+   five times (E048, E069, E081, E084, `knee-blend-raptor`). The sweep reports
+   three numbers — published 4, +axis 1, +axis 2, +both — and nothing else.
+3. **A variant more than 0.02 below its parent is a broken transform**, not
+   diversity, and its whole axis is dropped.
+4. **Correlation is the read even when the macro is not.** `maxspan-v5` and its
+   own reverse sit at **0.986** (E101) — nearly a copy, which is why four arms
+   bought only +0.0025. A new variant above ~0.98 with its parent is not a member,
+   it is a duplicate, whatever its own score.
+5. **gold-58's paired CI on a blend difference is ±0.006** (E101) and the board
+   floor is ±0.003 (E092). So a point estimate under +0.006 here is **not
+   separated and will be reported as such** — E101's one calibration point
+   (gold +0.0025 where the board read +0.004) is a single point, not a ratio.
+
+**WHAT WOULD MAKE THIS WORTH A SUBMISSION**: axis-level gain above +0.006 on
+gold with the parent correlations below 0.98. Anything less is recorded and not
+shipped, because the incumbent 0.932 is already banked and the board cannot
+resolve the difference.
+
+- **cost**: one free run, ~9 build groups over 58 studies. No submission, no new
+  asset, no training. **This is the fourth entry in three days where the E099
+  instrument replaced a board submission with arithmetic.**
