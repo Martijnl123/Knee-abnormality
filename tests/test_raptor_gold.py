@@ -144,8 +144,11 @@ def test_gold_expected_is_the_fifty_eight_this_project_has_always_scored_on():
 
 def test_the_gold_count_is_a_hard_failure_not_a_warning():
     src = GENERATED.read_text()
-    i = src.index("if len(gold) != GOLD_EXPECTED:")
+    # The guard is now conditioned on the split -- the `trainall` dump covers
+    # every training study on purpose, so a count of 58 would be wrong there.
+    i = src.index("len(gold) != GOLD_EXPECTED:")
     assert "raise RuntimeError" in src[i:i + 200]
+    assert 'EVAL_SPLIT != "trainall" and' in src[i - 40:i]
 
 
 # --------------------------------------------------------------------------- #

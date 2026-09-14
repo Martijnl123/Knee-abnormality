@@ -484,28 +484,48 @@ def main():
     # twelve filled in; the rest are blank. That set identity is asserted below
     # rather than assumed, because "58" arriving as 57 or 4,407 would still
     # produce a plausible-looking AUC.
-    if EVAL_SPLIT == "gold":
+    if EVAL_SPLIT in ("gold", "trainall"):
         tsdir = root + "/train_series"
         if not os.path.isdir(tsdir):
             tsdir = root + "/train_images"
         tr = pd.read_csv(root + "/train.csv")
         tr["StudyInstanceUID"] = tr["StudyInstanceUID"].astype(str)
         labelled = tr[list(LAB)].notna().all(axis=1)
+        if EVAL_SPLIT == "trainall":
+            # EVERY training study, scored by nothing in here.
+            #
+            # E106 needs per-finding blend weights derived from data the 58 gold
+            # are NOT in, so that gold-58 can then TEST the rule instead of
+            # producing it. The arbiter is the public report labels over 4,349
+            # non-gold studies -- 75x the sample of gold-58 and, crucially,
+            # disjoint from it. That scoring happens offline; this kernel's only
+            # job is to put the CoAtNet arms on the same studies the v1 lineage
+            # already has honest out-of-fold predictions for.
+            # Only the study list differs. Series lookup, the missing-series
+            # guard and the split print are all shared below; duplicating them
+            # here would leave two copies of the same logic to drift apart.
+            ids = tr["StudyInstanceUID"].tolist()
+            truth = None
+            print(f"trainall: {len(ids)} studies, of which "
+                  f"{int(labelled.sum())} carry expert labels — those are the "
+                  f"held-out test set for anything fitted on the rest, so "
+                  f"nothing downstream may fit on them", flush=True)
         gold = tr[labelled].reset_index(drop=True)
-        if len(gold) != GOLD_EXPECTED:
+        if EVAL_SPLIT != "trainall" and len(gold) != GOLD_EXPECTED:
             raise RuntimeError(
                 f"train.csv has {len(gold)} fully-labelled studies, expected "
                 f"{GOLD_EXPECTED}. The expert set this project scores on has "
                 f"changed shape; every historical gold number is about a "
                 f"different instrument until that is understood.")
-        ids = gold["StudyInstanceUID"].tolist()
-        truth = gold[list(LAB)].to_numpy(np.float64)
-        # Both classes must be present per finding or AUC is undefined, and an
-        # undefined column silently poisons the macro.
-        degenerate = [f for k, f in enumerate(LAB)
-                      if truth[:, k].min() == truth[:, k].max()]
-        if degenerate:
-            raise RuntimeError(f"single-class findings in gold: {degenerate}")
+        if EVAL_SPLIT != "trainall":
+            ids = gold["StudyInstanceUID"].tolist()
+            truth = gold[list(LAB)].to_numpy(np.float64)
+            # Both classes must be present per finding or AUC is undefined, and
+            # an undefined column silently poisons the macro.
+            degenerate = [f for k, f in enumerate(LAB)
+                          if truth[:, k].min() == truth[:, k].max()]
+            if degenerate:
+                raise RuntimeError(f"single-class findings in gold: {degenerate}")
         tser = pd.read_csv(root + "/train_series.csv")
     else:
         tsdir = root + "/test_series"
@@ -842,7 +862,22 @@ def main():
 @@ENDIF V1_MEMBERS@@
 
     scores = None
-    if EVAL_SPLIT == "gold":
+    if EVAL_SPLIT == "trainall":
+        # No scoring and no submission: 4,407 TRAINING studies. The arbiter lives
+        # offline, and a submission built from these would be scored against a
+        # hidden set it does not contain.
+        rows = []
+        for i, a in enumerate(ARMS):
+            d = pd.DataFrame(probs[i].astype(np.float32), columns=list(LAB))
+            d.insert(0, "arm", a["name"])
+            d.insert(0, "StudyInstanceUID", ids)
+            rows.append(d)
+        out = pd.concat(rows, ignore_index=True)
+        assert len(out) == len(ids) * len(ARMS)
+        out.to_parquet("/kaggle/working/trainall_probs.parquet", index=False)
+        print(f"wrote trainall_probs.parquet rows={len(out)} "
+              f"({len(ids)} studies x {len(ARMS)} arms)", flush=True)
+    elif EVAL_SPLIT == "gold":
         # NO submission.csv IS WRITTEN HERE, AND THAT IS THE POINT. These 58
         # studies are training data; a submission built from them would be
         # scored against the hidden set it does not contain. A notebook with no

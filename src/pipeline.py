@@ -1762,6 +1762,75 @@ EXTRAS = [
                                  lr=6e-4, seed=3).constants()},
         note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
     ),
+    # E106. THE CoAtNet ARMS ON ALL 4,407 STUDIES, so a blend rule can be FITTED
+    # somewhere other than the 58 studies it will be tested on.
+    #
+    # E105's oracle bound said the available headroom in the two shipped arms is
+    # +0.0076 gold, and that it is concentrated in three findings where the
+    # uniform 0.5 weight DESTROYS AUC: MCL 0.982 -> 0.950, Medial Meniscus
+    # 0.968 -> 0.948, ACL 0.977 -> 0.973. CoAtNet is far ahead there and
+    # averaging a weaker member in costs real ordering.
+    #
+    # Fitting twelve per-finding weights on 58 studies is what this log has
+    # declined six times and it stays declined. What makes this different is that
+    # the weights are derived on 4,349 studies the 58 are NOT in, so gold-58
+    # becomes a HELD-OUT TEST of the rule rather than its source. This project
+    # has never had a train/validate split for a blend weight.
+    #
+    # The arbiter offline is the public report labels (`stevenleehans`, CC0),
+    # which E041 measured at 0.8927 macro against the 58 expert studies. E093
+    # called that proxy's validity unverified and it still is -- but it carries
+    # 75x the sample and, unlike gold-58, using it leaves an honest test set.
+    #
+    # The v1 side already exists: `knee-infer-v1pub`'s five folds dumped honest
+    # out-of-fold predictions covering all 4,407 (verified: 882+882+881+881+881).
+    # Only the CoAtNet side is missing, and this is it.
+    #
+    # COST: E099 measured 4.65 s/study for these four arms, so 4,407 studies is
+    # ~5.7 h against the 9 h cap. No submission. The dump is reusable: every
+    # future blend question about this arm becomes arithmetic instead of a run.
+    Kernel(
+        slug="knee-trainall-raptor",
+        directory="91_trainall_raptor",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "trainall",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION, and it writes none. Runs the four CC0 CoAtNet\n"
+             "arms over all 4,407 TRAINING studies and dumps raw per-study\n"
+             "probabilities to trainall_probs.parquet.\n"
+             "\n"
+             "WHY: E105 bounded the headroom left in the two shipped arms at\n"
+             "+0.0076 gold and found it concentrated where the uniform 0.5\n"
+             "weight destroys AUC - MCL 0.982 -> 0.950, Medial Meniscus\n"
+             "0.968 -> 0.948. A per-finding weight would recover it, and\n"
+             "fitting twelve weights on 58 studies is refused here.\n"
+             "\n"
+             "So the weights get fitted on the 4,349 NON-GOLD studies against\n"
+             "the public report labels, and the 58 gold become a held-out\n"
+             "test of the rule. That split is the entire point: this project\n"
+             "has never validated a blend weight on data that did not\n"
+             "produce it.\n"
+             "\n"
+             "~5.7 h at E099's measured 4.65 s/study, against a 9 h cap.\n"
+             "Watch the projection line at study 100; it should read ~1.7 h\n"
+             "per 1,300.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
     # E104's READOUT. Both label arms scored on the 58, in ONE run, separately.
     #
     # The gold dump emits one block per v1 member rather than their average,

@@ -6280,3 +6280,84 @@ answers** on the 58 — an upper bound no honest scheme can reach:
   weakest at. That uses the v1 lineage's own data and never touches gold.
 - **cost of this entry**: one submission (already spent) and arithmetic on files
   already on disk. **Three routes closed, one ceiling established, zero GPU.**
+
+
+### E106 — PRE-REGISTERED, NOT YET RUN: a blend weight fitted somewhere the test set is not
+- **date**: 2026-09-14, written **before** the run. `knee-trainall-raptor`, ~5.7
+  GPU-h, **no submission**. Quota reopened; ~30 h available.
+
+**THE PROBLEM E105 LEFT.** The oracle bound on the two shipped arms is **+0.0076
+gold** (≈ +0.014 board at the measured 1.8× ratio), and it is concentrated in
+three findings where the uniform 0.5 weight **destroys** AUC rather than failing
+to add any:
+
+| finding | CoAtNet | v1 | blended 0.5 | oracle w for v1 | cost of uniform |
+|---|---:|---:|---:|---:|---:|
+| **MCL** | 0.982 | 0.882 | 0.950 | **0.00** | **−0.032** |
+| **Medial Meniscus** | 0.968 | 0.929 | 0.948 | **0.00** | **−0.019** |
+| ACL | 0.977 | 0.962 | 0.973 | 0.00 | −0.004 |
+
+  Those three are **+0.0046 of the +0.0076**. The headroom is mostly *undoing
+  damage*, not finding signal — which is what makes a per-finding weight the
+  right instrument and also what makes it dangerous.
+
+**WHY THIS IS NOT THE THING DECLINED SIX TIMES.** E048, E069, E081, E084,
+`knee-blend-raptor` and E103 each refused a weight chosen on the 58 gold studies.
+That refusal stands. **What changes here is where the weight comes from:**
+
+| | fitted on | tested on |
+|---|---|---|
+| every refused scheme | the 58 gold | the same 58 gold |
+| **this** | **4,349 non-gold studies** | **the 58 gold, never seen by the fit** |
+
+  **This project has never validated a blend weight on data that did not produce
+  it.** That is the entire point of the run, and it is worth 5.7 GPU-h
+  independently of whether the rule wins.
+
+**THE ARBITER, AND ITS KNOWN DEFECT STATED FIRST.** The 4,349 non-gold studies
+have no expert labels, so the judge is the public report labels
+(`stevenleehans`, CC0) that this project already trains on. **E093 called that
+proxy's validity unverified and it still is** — gap spans 0.181, Spearman 0.573
+against gold. It carries **75× the sample** of gold-58 and, unlike gold-58, using
+it leaves an honest test set. **If the rule fails, "the proxy is bad" and "the
+rule is bad" will not be separable, and that ambiguity is accepted in advance.**
+
+**THE FORMULA, FIXED NOW, WITH ZERO FREE PARAMETERS.** For each finding *f*,
+with `s_x(f) = max(0, AUC_x(f) − 0.5)` measured on the 4,349 against the report
+labels:
+
+```
+w_v1(f) = s_v1(f) / (s_v1(f) + s_coat(f))
+```
+
+  Skill above chance, normalised. No threshold, no shrinkage coefficient, no
+  cut-off — **every one of those would be a free parameter chosen by someone who
+  has seen the answer.** Where CoAtNet is far ahead the v1 weight falls out
+  automatically, which is exactly the MCL case.
+
+**THE ACCEPTANCE RULES.**
+
+1. **Primary**: the rule must beat uniform 0.5 **on the held-out 58** by
+   **> +0.0030 gold**. At the 1.8× ratio that is ~+0.005 board, clear of the
+   ±0.003 floor (E092). **Below +0.0030 it is recorded and not shipped.**
+2. **The oracle is the ceiling, not the target.** +0.0076 is what a scheme that
+   read the answers achieved. A rule fitted elsewhere capturing even **half**
+   of it would be the best-validated blend weight in this log.
+3. **A negative result is a real result.** If weights derived on 4,349 studies
+   *lose* on the 58, that is evidence the report-label proxy does not transfer —
+   which would retire a much bigger idea than this one, since the proxy underpins
+   every label the project trains on.
+4. **Reported alongside, never instead**: the same formula's weights, and the
+   uniform 0.5, both scored on the 58. One number without its control is what
+   E060 exists to prevent.
+
+**WHAT THE RUN ALSO BUYS, independent of the rule.** The CoAtNet arms have only
+ever been run on 58 studies and a 3-row stub. **`trainall_probs.parquet` puts
+them on all 4,407**, which turns every future question about this arm — any
+partner, any weight, any per-finding scheme — into arithmetic on a file instead
+of a GPU run. It is the same leverage E099 bought at 58 studies, at 76× the
+sample.
+
+- **cost**: ~5.7 h of ~30, one kernel, no submission, no new asset. The v1 side
+  already exists: `knee-infer-v1pub`'s five folds cover all 4,407 out-of-fold
+  (882+882+881+881+881, verified).

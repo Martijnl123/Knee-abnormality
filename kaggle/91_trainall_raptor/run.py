@@ -57,39 +57,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# NOT A SUBMISSION. Twelve arms from the same three CC0
-# checkpoints, scored on the 58 expert studies, dumping raw
-# per-study probabilities so TTA can be priced offline.
+# NOT A SUBMISSION, and it writes none. Runs the four CC0 CoAtNet
+# arms over all 4,407 TRAINING studies and dumps raw per-study
+# probabilities to trainall_probs.parquet.
 #
-# AXIS 1: upstream publishes ONE transform arm - maxspan-v5 with
-# its slice triplet reversed - and never applies it to the other
-# two files. This does. Two extra members for two extra forward
-# passes on volumes already built.
+# WHY: E105 bounded the headroom left in the two shipped arms at
+# +0.0076 gold and found it concentrated where the uniform 0.5
+# weight destroys AUC - MCL 0.982 -> 0.950, Medial Meniscus
+# 0.968 -> 0.948. A per-finding weight would recover it, and
+# fitting twelve weights on 58 studies is refused here.
 #
-# AXIS 2: span jitter. `span` picks which source slices fill the
-# stack, so shifting it resamples the volume. The step is 0.04,
-# which is the gap between upstream's OWN spans (v5 and v10 at
-# 0.02-0.98, v8 at 0.06-0.94) - taken from their choices, not
-# from a score.
+# So the weights get fitted on the 4,349 NON-GOLD studies against
+# the public report labels, and the 58 gold become a held-out
+# test of the rule. That split is the entire point: this project
+# has never validated a blend weight on data that did not
+# produce it.
 #
-# NO HORIZONTAL FLIP, on purpose. Four of the twelve findings
-# are Medial/Lateral Meniscus and Medial/Lateral OA, and medial
-# versus lateral is which SIDE of the knee a structure sits on.
-# Mirroring a left knee makes it a right knee and swaps the two,
-# so those four would be read off the wrong compartment.
-#
-# Weights are flat because the blend is searched offline; the
-# kernel's own blend line is a flat average, not the result.
+# ~5.7 h at E099's measured 4.65 s/study, against a 9 h cap.
+# Watch the projection line at study 100; it should read ~1.7 h
+# per 1,300.
 #
 # ATTRIBUTION: as `knee-infer-raptorcc0`.
 #
-MEMBERS_EXPECTED = 12
-ARMS             = ({'name': 'maxspan-v5', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9214}, {'name': 'native384dense-v10', 'file': 'raptor_ft_coatnet_v10_full.pt', 'img': 384, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9174}, {'name': 'maxspan-v5-reverse', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': True, 'w': 1.0, 'expect_gold': 0.9214}, {'name': 'native384-v8', 'file': 'raptor_ft_coatnet_v8_full_swa.pt', 'img': 384, 'slots': (('Sagittal', 1, 12), ('Sagittal', 0, 10), ('Coronal', 1, 8), ('Coronal', 0, 6), ('Axial', -1, 8)), 'span': (0.06, 0.94), 'k_eval': 42, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9067}, {'name': 'native384dense-v10-reverse', 'file': 'raptor_ft_coatnet_v10_full.pt', 'img': 384, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': True, 'w': 1.0, 'expect_gold': 0.9174}, {'name': 'native384-v8-reverse', 'file': 'raptor_ft_coatnet_v8_full_swa.pt', 'img': 384, 'slots': (('Sagittal', 1, 12), ('Sagittal', 0, 10), ('Coronal', 1, 8), ('Coronal', 0, 6), ('Axial', -1, 8)), 'span': (0.06, 0.94), 'k_eval': 42, 'reverse': True, 'w': 1.0, 'expect_gold': 0.9067}, {'name': 'maxspan-v5-span04', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.06, 0.94), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9214}, {'name': 'maxspan-v5-span08', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.1, 0.9), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9214}, {'name': 'native384dense-v10-span04', 'file': 'raptor_ft_coatnet_v10_full.pt', 'img': 384, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.06, 0.94), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9174}, {'name': 'native384dense-v10-span08', 'file': 'raptor_ft_coatnet_v10_full.pt', 'img': 384, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.1, 0.9), 'k_eval': 62, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9174}, {'name': 'native384-v8-span04', 'file': 'raptor_ft_coatnet_v8_full_swa.pt', 'img': 384, 'slots': (('Sagittal', 1, 12), ('Sagittal', 0, 10), ('Coronal', 1, 8), ('Coronal', 0, 6), ('Axial', -1, 8)), 'span': (0.1, 0.9), 'k_eval': 42, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9067}, {'name': 'native384-v8-span08', 'file': 'raptor_ft_coatnet_v8_full_swa.pt', 'img': 384, 'slots': (('Sagittal', 1, 12), ('Sagittal', 0, 10), ('Coronal', 1, 8), ('Coronal', 0, 6), ('Axial', -1, 8)), 'span': (0.14, 0.86), 'k_eval': 42, 'reverse': False, 'w': 1.0, 'expect_gold': 0.9067})
+MEMBERS_EXPECTED = 4
+ARMS             = ({'name': 'maxspan-v5', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': False, 'w': 0.55, 'expect_gold': 0.9214}, {'name': 'native384dense-v10', 'file': 'raptor_ft_coatnet_v10_full.pt', 'img': 384, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': False, 'w': 0.1, 'expect_gold': 0.9174}, {'name': 'maxspan-v5-reverse', 'file': 'raptor_ft_coatnet_v5_full_swa.pt', 'img': 336, 'slots': (('Sagittal', 1, 18), ('Sagittal', 0, 14), ('Coronal', 1, 12), ('Coronal', 0, 8), ('Axial', -1, 12)), 'span': (0.02, 0.98), 'k_eval': 62, 'reverse': True, 'w': 0.15, 'expect_gold': 0.9214}, {'name': 'native384-v8', 'file': 'raptor_ft_coatnet_v8_full_swa.pt', 'img': 384, 'slots': (('Sagittal', 1, 12), ('Sagittal', 0, 10), ('Coronal', 1, 8), ('Coronal', 0, 6), ('Axial', -1, 8)), 'span': (0.06, 0.94), 'k_eval': 42, 'reverse': False, 'w': 0.2, 'expect_gold': 0.9067})
 CROP_MM          = 140.0
 LAB              = ('ACL', 'MCL', 'Medial Meniscus', 'Lateral Meniscus', 'Medial OA', 'Lateral OA', 'PF OA', 'Effusion', 'Synovitis', "Baker's", 'Contusion', 'Fracture')
 FALLBACK_LIMIT   = 0.02
 DECODE_AHEAD     = 32
-EVAL_SPLIT       = "gold"
+EVAL_SPLIT       = "trainall"
 GOLD_EXPECTED    = 58
 V1_MEMBERS       = None
 
