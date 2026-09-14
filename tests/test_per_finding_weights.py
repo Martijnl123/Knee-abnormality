@@ -160,3 +160,67 @@ def test_the_coatnet_column_uses_upstreams_published_weights_unchanged():
         "maxspan-v5": 0.55, "native384-v8": 0.20,
         "maxspan-v5-reverse": 0.15, "native384dense-v10": 0.10}
     assert sum(pfw.PUBLISHED_ARM_WEIGHTS.values()) == pytest.approx(1.0)
+
+
+# --------------------------------------------------------------------------- #
+# End to end
+# --------------------------------------------------------------------------- #
+def test_the_whole_pipeline_recovers_a_planted_per_finding_structure(tmp_path, capsys):
+    """A corpus built so that ONE finding wants each extreme.
+
+    MCL is the real case (E105: CoAtNet 0.982, v1 0.882, uniform blending costs
+    0.032), so it is planted here as CoAtNet-perfect / v1-at-chance. Baker's is
+    planted the other way round, because a rule that only ever pushes weight in
+    one direction would pass a one-sided test and still be wrong.
+
+    This runs the actual CLI over an actual parquet and actual fold dumps — the
+    unit tests above cover the arithmetic, and this covers the joins, the arbiter
+    threshold and the gold/fit split that the arithmetic sits inside.
+    """
+    import json
+
+    import pandas as pd
+
+    rng = np.random.default_rng(0)
+    n, lab = 600, pfw.FINDINGS
+    ids = [f"study{i:04d}" for i in range(n)]
+    y = rng.integers(0, 2, (n, 12)).astype(float)
+    coat = y * 0.55 + rng.random((n, 12)) * 0.45
+    v1 = y * 0.45 + rng.random((n, 12)) * 0.55
+    mcl, baker = lab.index("MCL"), lab.index("Baker's")
+    coat[:, mcl] = y[:, mcl] * 0.95 + rng.random(n) * 0.05
+    v1[:, mcl] = rng.random(n)
+    v1[:, baker] = y[:, baker] * 0.95 + rng.random(n) * 0.05
+    coat[:, baker] = rng.random(n)
+
+    blocks = []
+    for arm in pfw.PUBLISHED_ARM_WEIGHTS:
+        d = pd.DataFrame(coat + rng.normal(0, 0.02, coat.shape), columns=lab)
+        d.insert(0, "arm", arm)
+        d.insert(0, "StudyInstanceUID", ids)
+        blocks.append(d)
+    pd.concat(blocks, ignore_index=True).to_parquet(tmp_path / "coat.parquet", index=False)
+    for fold in range(5):
+        chunk = slice(fold * 120, (fold + 1) * 120)
+        (tmp_path / f"oof_all_fold{fold}.json").write_text(json.dumps(
+            {"fold": fold, "findings": lab, "studies": ids[chunk],
+             "predicted": v1[chunk].tolist()}))
+    labels = pd.DataFrame(y, columns=lab)
+    labels.insert(0, "StudyInstanceUID", ids)
+    labels.to_csv(tmp_path / "labels.csv", index=False)
+    train = pd.DataFrame({"StudyInstanceUID": ids})
+    for k, finding in enumerate(lab):
+        train[finding] = [y[i, k] if i < 58 else np.nan for i in range(n)]
+    train.to_csv(tmp_path / "train.csv", index=False)
+
+    assert pfw.main(["--coat", str(tmp_path / "coat.parquet"),
+                     "--v1", str(tmp_path / "oof_all_fold*.json"),
+                     "--labels", str(tmp_path / "labels.csv"),
+                     "--gold", str(tmp_path / "train.csv")]) == 0
+    out = capsys.readouterr().out
+    assert "gold studies (TEST set, never fitted on): 58" in out
+    assert "fit studies (non-gold, report-labelled): 542" in out
+
+    row = {line.split()[0]: line for line in out.splitlines() if line.strip().startswith(("MCL", "Baker"))}
+    assert float(row["MCL"].split()[-1]) < 0.05, "the chance arm kept weight on MCL"
+    assert float(row["Baker's"].split()[-1]) > 0.85, "the strong arm was not given Baker's"
