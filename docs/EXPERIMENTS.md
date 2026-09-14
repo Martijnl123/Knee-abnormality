@@ -6533,3 +6533,62 @@ which would have printed 0.941. It printed 0.938.
 - **what was right about running it**: the cost of being wrong really was zero.
   0.938 stayed banked, one of five daily slots was spent, and a question that had
   been argued six times is now answered on the only instrument that counts.
+
+
+### E108 — E106 was over-generalised, and narrowing it reopens the span question
+- **date**: 2026-09-14. The measurement below is CPU-only on files already on
+  disk. The run it justifies (`knee-trainall-span04`, ~6.6 GPU-h) is **pushed and
+  pending**; its acceptance rules are fixed here before it lands.
+
+**A RULE OF MINE FROM TWO ENTRIES AGO WAS TOO BROAD.** E106 wrote into `PATH.md`:
+*"No model-selection decision here may use report labels as the judge, at any
+number of parameters."* That over-generalises its own evidence.
+
+**E106's mechanism is a bias between models trained differently.** The public arms
+were fitted toward LLM-parsed report labels, so scoring them on report labels
+rewards agreement with what they were fitted to, and this project's v1 arm earns
+its +0.006 exactly where it departs from that consensus. **That bias is
+common-mode between two inference geometries of the SAME checkpoint** — same
+weights, same training, differing only in which source slices are fed — so it
+cancels. Measured, ranking the four published CoAtNet arms:
+
+| comparison | agreement with gold-58 |
+|---|---:|
+| **within a checkpoint family** (four published arms, this entry) | **Spearman +0.800** |
+| across architectures (per-finding weight vectors, E106) | +0.052 |
+
+  The only disagreement is ranks 3 and 4, which sit **0.0051 apart** on gold —
+  inside its own noise. **Within a family the proxy is a usable judge carrying 75×
+  gold-58's sample; across families it is worse than useless.** `PATH.md` now
+  records the boundary rather than the blanket.
+
+**WHICH REOPENS THE ONE QUESTION E103 HAD TO LEAVE OPEN.** E103 found **all six**
+span-narrowed variants beat their parent on the 58 gold — six for six, one
+direction — and `maxspan-v5-span04` at **0.9253** is the highest single arm this
+project has ever measured, above the published four-arm blend itself. It closed
+anyway, and for the right reason: **gold-58 produced that hypothesis and would
+have been the only thing testing it.**
+
+- **now the 4,349 can test it**, and gold-58 does not have to judge its own
+  output. That is the same train/validate discipline E106 was built for, applied
+  where the arbiter actually works.
+- **one step for all three checkpoints, not each one's best.** Gold's per-arm
+  optima disagree — span04 for v5 and v10, span08 for v8 — and picking per
+  checkpoint would be three parameters fitted on 58 studies. **0.04 is upstream's
+  own spacing between its published arms** and is applied uniformly.
+
+**ACCEPTANCE, FIXED NOW.**
+
+1. **All three narrowed arms beat their parents on the 4,349** → the direction is
+   confirmed at 75× gold's sample and a span04 submission is built.
+2. **Two of three, or less** → not confirmed. The gold 6-for-6 was the small-sample
+   artefact it was suspected of being, and the route closes for good.
+3. **gold-58 is NOT evidence here and will not be quoted as such.** It already
+   says +0.0055 / +0.0049 / +0.0017 for these three. Agreement is expected and
+   circular; only the 4,349 reading counts.
+4. **Even on a pass, the board is the judge of the submission.** E107 just
+   established that this project has no offline instrument that can tune a blend
+   — but this is not tuning a blend, it is choosing a preprocessing for a fixed
+   model, which is the class E108 has just shown the proxy *can* rank.
+
+- **cost**: ~6.6 GPU-h of the ~16 remaining, no submission, no new asset.

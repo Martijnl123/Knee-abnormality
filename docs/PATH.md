@@ -32,8 +32,19 @@ at all. The mechanism is that the public arms were themselves trained toward
 LLM-parsed report labels, so scoring them on report labels rewards agreement with
 what they were fitted to, and the v1 arm earns its gain exactly where it departs
 from that consensus. **No model-selection decision here may use report labels as
-the judge, at any number of parameters.** Training on them remains correct and
-remains this project's largest single gain (E044, +0.1067).
+the judge ACROSS ARCHITECTURES, at any number of parameters.** Training on them
+remains correct and remains this project's largest single gain (E044, +0.1067).
+
+**NARROWED 2026-09-14 (E108), and the first version of this rule was too broad.**
+It said "no model-selection decision", full stop, which over-generalises its own
+evidence. E106's mechanism is that the proxy rewards a model for agreeing with
+the labels it was TRAINED on — a bias *between* models trained differently, and
+**common-mode between two inference geometries of the SAME checkpoint**, where it
+cancels. Measured: ranking the four published CoAtNet arms, the proxy agrees with
+gold-58 at **Spearman +0.800**, against **+0.052** for the cross-architecture
+weight vectors E106 measured. **Within a checkpoint family the proxy is a usable
+judge carrying 75× gold-58's sample; across families it is worse than useless.**
+The rule is a boundary, not a blanket.
 
 ## 1. The one number that governs the plan
 

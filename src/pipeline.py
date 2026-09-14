@@ -497,6 +497,31 @@ RAPTOR_TTA_ARMS = (
     _variant(_V8, "native384-v8-span08", span=_span(0.06, 0.94, 0.08)),
 )
 
+# E108. ONE STEP NARROWER, ON EVERY CHECKPOINT, TESTED AT 75x GOLD'S SAMPLE.
+#
+# E103 found all SIX span-narrowed variants beat their parent on the 58 gold --
+# six for six, one direction -- and `maxspan-v5-span04` at 0.9253 is the highest
+# single arm this project has measured, above the published four-arm blend. It
+# closed anyway, because gold-58 both produced that hypothesis and would have
+# been the only thing testing it.
+#
+# E108's finding reopens it: the report-label proxy ranks the four published
+# CoAtNet arms at Spearman +0.800 against gold, where E106 measured +0.052 for
+# the cross-architecture case. E106's bias is that the proxy rewards a model for
+# agreeing with the labels it was trained on -- and that is common-mode between
+# two inference geometries of the SAME checkpoint. It cancels. So the 4,349
+# non-gold studies can judge this, and gold-58 does not have to judge its own
+# hypothesis.
+#
+# ONE STEP FOR ALL THREE, not the per-checkpoint best. Gold's own per-arm optima
+# disagree (span04 for v5 and v10, span08 for v8); picking each checkpoint's best
+# would be three parameters fitted on 58 studies. 0.04 is upstream's own spacing
+# and is applied uniformly.
+RAPTOR_SPAN04_ARMS = tuple(
+    _variant(a, f"{a['name']}-span04", span=_span(a["span"][0], a["span"][1], 0.04))
+    for a in (RAPTOR_V5, RAPTOR_ARMS[1], RAPTOR_ARMS[3])
+)
+
 V1 = Geometry(
     mm_per_pixel=0.6, size=192, slices=20,
     note="0.6 mm/px over 192 px covers ~115 mm, which contains the knee joint\n"
@@ -1761,6 +1786,53 @@ EXTRAS = [
                    **TrainConfig(backbone="resnet34", epochs=24, batch=16,
                                  lr=6e-4, seed=3).constants()},
         note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
+    ),
+    # E108's READOUT: the three narrowed arms on all 4,407, to sit beside E106's
+    # dump of the three published ones and be compared on the 4,349 that are not
+    # the 58.
+    Kernel(
+        slug="knee-trainall-span04",
+        directory="92_trainall_span04",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 3,
+            "ARMS": RAPTOR_SPAN04_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "trainall",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. The three CoAtNet checkpoints run one span\n"
+             "step narrower - 0.04 at each end, upstream's own spacing - over\n"
+             "all 4,407 studies.\n"
+             "\n"
+             "WHY IT IS BACK. E103 found six of six narrowed variants beat\n"
+             "their parent on the 58 gold and closed the route anyway,\n"
+             "because gold-58 had produced that hypothesis and would have\n"
+             "been the only thing testing it. E108 measured the report-label\n"
+             "proxy ranking the four published arms at Spearman +0.800\n"
+             "against gold, where E106 got +0.052 across architectures: the\n"
+             "proxy's bias is agreement with what a model was TRAINED on, and\n"
+             "that is common-mode between two geometries of one checkpoint.\n"
+             "\n"
+             "So the 4,349 non-gold studies decide, and gold-58 no longer has\n"
+             "to judge its own hypothesis.\n"
+             "\n"
+             "ONE STEP FOR ALL THREE. Gold's per-arm optima disagree (span04\n"
+             "for v5 and v10, span08 for v8) and picking each checkpoint's\n"
+             "best would be three parameters fitted on 58 studies.\n"
+             "\n"
+             "~6.6 h at E106's measured 1.01 s/study over three build groups.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
     ),
     # E106. THE CoAtNet ARMS ON ALL 4,407 STUDIES, so a blend rule can be FITTED
     # somewhere other than the 58 studies it will be tested on.
