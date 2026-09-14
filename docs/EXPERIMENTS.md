@@ -6034,7 +6034,7 @@ measured** — above the published four-arm blend itself.
   at one submission**, and the incumbent 0.932 already stands.
 
 
-### E104 — PRE-REGISTERED, NOT YET RUN: the label set E089 called unscoreable, measured on a model instead
+### E104 — the label set E089 called unscoreable, measured on a model: not separated
 - **date**: 2026-09-13, written **before** the run. Two full-fit trainers,
   ~1.4 GPU-h each. Written after the weekly quota reopened and a teammate joined,
   adding ~30 h. **No submission.**
@@ -6119,3 +6119,79 @@ constraint holds and the log agrees with it: labels and data account for +0.166
 of this project's +0.198, and every architecture lever measured zero, negative,
 or inside E060's noise floor. **This is a data lever priced at 2.8 GPU-h with an
 honest holdout, which is the cheapest well-posed question left.**
+
+**RESULT (2026-09-14). THE HOLDOUT IS REAL AND THE ANSWER IS RULE 2.**
+
+Both trainers printed **`gold studies in cache: 0`**, the pre-registered tell.
+The four CoAtNet controls read 0.9198 / 0.9170 / 0.9167 / 0.9116 for a **fifth**
+consecutive run.
+
+| arm | gold-58 |
+|---|---:|
+| **A — `dreaddevelopment` labels** | **0.8938** |
+| **B — incumbent labels, same 4,349 studies** | **0.8857** |
+| paired difference | **+0.0081, 95% CI [−0.0133, +0.0297], P(A>B) = 0.778** |
+
+**NOT SEPARATED.** Rule 2 fires on either instrument — the point estimate is
+under E104's 0.015 bar and the paired interval spans zero by a wide margin.
+**Upstream's self-reported +0.013 does not reproduce as a separated result** on
+this architecture, on this instrument. The label route closes for a fourth time,
+now on a *model* rather than on a proxy (E089 screened the labels; E093 found the
+report-label proxy of unverified validity; this screens the thing itself).
+
+  **A note on the interval, because E104 cited the wrong one.** Rule 2 quoted
+  E031's **absolute** ±0.0153. These two arms are scored on the same 58 studies,
+  so the **paired** interval is the right instrument — and here it is **±0.021**,
+  wider than absolute, not tighter. E101's ±0.006 paired figure came from
+  comparing a blend against its own member at correlation 0.98; these two arms
+  correlate at **0.807**, so far more of the difference survives the pairing.
+  **A paired CI is not automatically the tighter one**, and reading E101's number
+  as a constant would have been wrong here.
+
+**THE MECHANISM IS VISIBLE EVEN THOUGH THE MACRO IS NOT.** The two labelers
+disagree most on **Synovitis (Spearman 0.520)**, and Synovitis is where arm A
+gains most: **0.775 against 0.700, +0.075**, the largest single-finding move in
+the table. Across all twelve, gain against label-disagreement correlates
+**−0.315** — the predicted direction, far from conclusive at n=12. But the losses
+are just as large (Lateral OA −0.052, Contusion −0.046, Medial OA −0.029), which
+is why the macro washes out. **A better label set for one finding is not a better
+label set.**
+
+**AND THE PRACTICAL QUESTION ANSWERS NEGATIVE.** Blended 50/50 with the CoAtNet
+column, against that column alone at 0.9222:
+
+| v1-side member(s) | alone | blended | vs CoAtNet | 95% CI |
+|---|---:|---:|---:|---|
+| **`v1public` 5-fold OOF (E101's partner)** | 0.8980 | **0.9254** | **+0.0031** | [−0.0081, +0.0142] |
+| arm A, dread full-fit | 0.8938 | 0.9182 | −0.0041 | [−0.0155, +0.0072] |
+| arm B, incumbent full-fit | 0.8857 | 0.9205 | −0.0018 | [−0.0148, +0.0107] |
+| arms A + B, two label sets | **0.9004** | 0.9209 | −0.0014 | [−0.0125, +0.0093] |
+| arms A + B + `v1public` | 0.9064 | 0.9238 | +0.0016 | [−0.0095, +0.0122] |
+
+  **The new arms score higher alone and blend worse**, and the correlations say
+  why: dread sits at **0.840** with the CoAtNet column where `v1public` sits at
+  **0.793**. More training data made the member stronger *and* more like CoAtNet,
+  and the second cost more than the first paid. **E101's original pairing remains
+  the best thing this project has built.**
+
+  **CAVEAT, stated rather than buried**: `v1public` is five pooled fold models
+  and each label arm is **one** model, so the blend rows differ in member count
+  as well as in labels. The A-versus-B comparison above is clean; this table is
+  not. Five seeds of arm A would cost ~7 GPU-h to settle it — **not spent**,
+  because A-versus-B was not separated, the 2-arm pool already blends worse, and
+  E064 priced additional same-kind seeds at +0.001.
+
+**THE FINDING WORTH CARRYING FORWARD, across E103 and E104.** Three ways to get a
+decorrelated member, measured against the same CoAtNet column:
+
+| source of diversity | rank correlation |
+|---|---:|
+| **test-time augmentation** (E103, same weights) | **0.966 – 0.987** |
+| **different labels** (E104, same architecture, same studies) | **0.807** |
+| **different architecture** (E101, resnet34 vs CoAtNet) | **0.793** |
+
+  **Changing the labels buys almost as much decorrelation as changing the
+  architecture, and ten times what augmentation buys.** That is a real and
+  transferable result. It does not pay here only because the label arms are
+  individually weaker and closer to CoAtNet — but it is the first measurement in
+  this log of *where model diversity actually comes from*.
