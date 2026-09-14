@@ -6434,3 +6434,64 @@ exactly the contribution the proxy is blind to by construction.
   the four CoAtNet arms on all 4,407 studies. Every future question about this
   arm — any partner, any weight, any scheme — is now arithmetic on a file. That
   asset is what made this diagnosis possible at all, and it outlives the entry.
+
+
+### E107 — the one fitted number, and the reason it is allowed now
+- **date**: 2026-09-14. CPU only. One submission queued. `V1_BLEND_W` 0.50 → 0.40
+  in `knee-infer-raptorv1`.
+
+**SIX REFUSALS, AND WHAT ACTUALLY CHANGED.** E048, E069, E081, E084,
+`knee-blend-raptor` and E103 each declined a blend weight chosen on the 58 gold
+studies. **The evidence has not improved. The cost of being wrong has collapsed.**
+The board keeps a team's best submission, **0.938 is banked**, and the daily slots
+go unused — so testing a weight can no longer lose anything. That was never true
+before, and it is the only thing that changed. **This entry is not a claim that
+the old refusals were wrong; it is a claim that the question is now free to ask.**
+
+**GOLD-58 SUPPORTS THE DIRECTION AND NOT THE MAGNITUDE**, bootstrapped over 4,000
+resamples of the 58:
+
+| | |
+|---|---|
+| optimal weight, median | **0.35** |
+| optimal weight, 95% interval | **[0.05, 0.55]** |
+| **P(optimum ≤ 0.50)** | **0.972** |
+| w=0.30 minus w=0.50 | +0.0022, CI [−0.0044, +0.0092] |
+| P(0.30 beats 0.50) | 0.734 |
+
+  **The shipped 0.50 sits at the top edge of the plausible range.** Moving down is
+  well supported; moving to any *particular* value is not separated at all.
+
+**AND A SECOND INSTRUMENT DISAGREES, which is why the move is small.** Weighting
+the two arms by their measured **board** scores — 0.932 for the CoAtNet four and
+0.926 for the full-fit five, the only instrument in this project that has never
+misled — gives `(0.926−0.5)/((0.932−0.5)+(0.926−0.5))` = **0.497**, i.e. the
+status quo. It is a two-number comparison of overall accuracy and says nothing
+about optimal *mixing*, so it is weaker evidence on this question than gold-58 —
+but it is not zero, and it points the other way.
+
+**0.40, NOT GOLD'S OWN ARGMAX OF 0.30.** Two reasons, both pulling the same way:
+
+1. **The sweep's v1 is not the shipped v1.** It used the five-fold out-of-fold
+   member at 0.8980 gold; the submission mounts the **full-fit five**, which the
+   board scores at **0.926 against the fold ensemble's 0.923**. A stronger member
+   wants *more* weight, not less.
+2. The board-ratio signal above sits at 0.497.
+
+  0.40 is between the bootstrap median (0.35) and the board ratio (0.497), and
+  nearer the median than 0.50 is. **It is a compromise between two instruments
+  that disagree, and it is recorded as that rather than as an optimum.**
+
+**PRE-REGISTERED, before the run.** Against the incumbent 0.938:
+
+| board | reading |
+|---|---|
+| **≥ 0.941** | the direction transfers; gold-58 was right that 0.50 was too high |
+| 0.936–0.940 | inside the ±0.003 floor — **no evidence either way**, and 0.50 stays the default because it needs no justification |
+| **≤ 0.935** | the gold optimum does not transfer. **0.50 is restored and the seventh refusal becomes permanent** — gold-58 would then have failed on the one parameter it was best placed to estimate |
+
+- **the test itself is the point.** Whichever way it lands, this is the first time
+  this project has put a fitted blend weight in front of the only instrument that
+  can judge it. A 0.936–0.940 result is the most likely single outcome and is
+  explicitly *not* a licence to keep 0.40.
+- **cost**: one submission, ~3 h of kernel time, no new asset, no training.

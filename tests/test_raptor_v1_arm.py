@@ -136,19 +136,31 @@ def test_the_submission_kernel_and_the_gold_kernel_differ_only_in_the_split():
            {k: v for k, v in board.items() if k != "EVAL_SPLIT"}
 
 
-def test_the_blend_is_fifty_fifty_and_re_ranks_both_sides():
-    """E101's sweep peaks at w=0.3, and 0.5 is used anyway: the +0.0022 between
-    them is below the board's own +/-0.003 reseed floor (E092), so a weight
-    fitted on 58 studies would buy a difference the board cannot measure.
+def test_the_blend_weight_is_declared_and_inside_what_gold_supports():
+    """E107 moved this off 0.50 and it is the one fitted number in the pipeline.
 
-    Both sides are re-ranked first because the left is a WEIGHTED mean of rank
-    columns and the right a plain mean of them. Neither is uniform on (0,1), and
-    averaging them raw hands the ordering to whichever is flatter."""
+    Gold-58 bootstraps the optimum to a 95% interval of [0.05, 0.55], so a value
+    outside that is not supported by anything; and the board-score ratio for the
+    two arms is 0.497, so a value far below the interval's middle is not either.
+    The assertion is the SUPPORTED RANGE, not the specific number, because the
+    specific number is exactly what gold-58 could not separate."""
+    for slug in V1_SLUGS:
+        w = _kernel(slug).constants["V1_BLEND_W"]
+        assert 0.05 <= w <= 0.55, f"{slug} weight {w} is outside the bootstrap interval"
+    assert _kernel("knee-infer-raptorv1").constants["V1_BLEND_W"] == \
+           _kernel("knee-gold-raptorv1").constants["V1_BLEND_W"], \
+        "the gold check must run the weight the submission ships"
+
+
+def test_the_blend_re_ranks_both_sides_before_mixing():
+    """The left side is a WEIGHTED mean of rank columns and the right a plain
+    mean of them. Neither is uniform on (0,1), so averaging them raw hands the
+    ordering to whichever happens to be flatter."""
     src = BLEND.read_text()
     i = src.index("if v1_probs is not None:")
-    block = src[i:i + 900]
+    block = src[i:i + 2200]
     assert "coat_r, v1_r = rankpct(ranks), rankpct(v1_probs)" in block
-    assert "0.5 * coat_r + 0.5 * v1_r" in block
+    assert "(1.0 - V1_BLEND_W) * coat_r + V1_BLEND_W * v1_r" in block
 
 
 # --------------------------------------------------------------------------- #

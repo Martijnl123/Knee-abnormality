@@ -1862,6 +1862,7 @@ EXTRAS = [
             "EVAL_SPLIT": "gold",
             "GOLD_EXPECTED": 58,
             "V1_MEMBERS": 2,
+            "V1_BLEND_W": 0.40,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
@@ -2018,6 +2019,10 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 5,
+            # See the template: gold-58 supports moving BELOW 0.50 (P = 0.972)
+            # but cannot separate which value. 0.40 sits between the bootstrap
+            # median 0.35 and the board-score ratio 0.497.
+            "V1_BLEND_W": 0.40,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
@@ -2073,6 +2078,10 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 5,
+            # See the template: gold-58 supports moving BELOW 0.50 (P = 0.972)
+            # but cannot separate which value. 0.40 sits between the bootstrap
+            # median 0.35 and the board-score ratio 0.497.
+            "V1_BLEND_W": 0.40,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
