@@ -656,7 +656,7 @@ def main():
             torch.cuda.empty_cache()
 
     # ---- THE SECOND ARCHITECTURE'S PASS ------------------------------------
-    v1_probs = None
+    v1_probs, v1_members = None, {}
 
     weights = np.array([float(a["w"]) for a in ARMS], dtype=np.float64)
     weights = weights / weights.sum()
@@ -678,6 +678,7 @@ def main():
         # to learn that four arms beat one by +0.004 — and E098 closed six blends
         # on an instrument that had never once seen a blend gain.
         scores = {"split": "gold", "n": len(ids), "arms": {}}
+        rows = []
         for i, a in enumerate(ARMS):
             m, per = macro_auc(truth, probs[i])
             scores["arms"][a["name"]] = {
@@ -697,14 +698,13 @@ def main():
                            "per_finding": {f: round(bper[k], 4) for k, f in enumerate(LAB)}}
         print(f"[gold] BLEND macro {bm:.4f} | best single {best:.4f} | "
               f"gain {bm - best:+.4f}", flush=True)
-        rows = []
         for i, a in enumerate(ARMS):
             d = pd.DataFrame(probs[i].astype(np.float32), columns=list(LAB))
             d.insert(0, "arm", a["name"])
             d.insert(0, "StudyInstanceUID", ids)
             rows.append(d)
         out = pd.concat(rows, ignore_index=True)
-        assert len(out) == len(ids) * len(ARMS)
+        assert len(out) == len(ids) * (len(ARMS) + len(v1_members))
         out.to_csv("/kaggle/working/gold_probs.csv", index=False)
         truth_df = pd.DataFrame(truth.astype(np.int8), columns=list(LAB))
         truth_df.insert(0, "StudyInstanceUID", ids)

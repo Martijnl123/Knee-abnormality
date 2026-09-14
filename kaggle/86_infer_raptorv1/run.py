@@ -1078,11 +1078,11 @@ def main():
             torch.cuda.empty_cache()
 
     # ---- THE SECOND ARCHITECTURE'S PASS ------------------------------------
-    v1_probs = None
+    v1_probs, v1_members = None, {}
     if V1_MEMBERS:
         import torch as _torch
         ckpts, v1_prints = v1_checkpoints
-        v1_models = []
+        v1_models, v1_names = [], []
         for cp in ckpts:
             st = _torch.load(cp, map_location=device, weights_only=False)
             # Averaging is only meaningful between models fed the same way, and
@@ -1100,6 +1100,11 @@ def main():
             m.load_state_dict(w, strict=False)
             m.eval()
             v1_models.append(m)
+            # The mounting directory, which is the trainer slug. In gold mode each
+            # member is dumped under this name, so one run can score several
+            # SEPARATE models rather than only their average -- E104 needs two
+            # label arms compared, and averaging them would answer nothing.
+            v1_names.append(cp.parts[-2] if len(cp.parts) > 1 else cp.name)
             # FINGERPRINT EACH MEMBER FROM ITS OWN WEIGHTS. The five full-fit
             # members differ only by seed, so they land in five directories
             # holding a file of the SAME NAME -- and the first version of this
@@ -1185,6 +1190,8 @@ def main():
         member_ranks = np.stack([rankpct(np.nan_to_num(raw[mi], nan=0.5))
                                  for mi in range(len(v1_models))])
         v1_probs = member_ranks.mean(axis=0)
+        v1_members = {v1_names[mi]: np.nan_to_num(raw[mi], nan=0.5)
+                      for mi in range(len(v1_models))}
         del v1_models
         gc.collect()
         if str(device).startswith("cuda"):
@@ -1227,6 +1234,7 @@ def main():
         # to learn that four arms beat one by +0.004 — and E098 closed six blends
         # on an instrument that had never once seen a blend gain.
         scores = {"split": "gold", "n": len(ids), "arms": {}}
+        rows = []
         for i, a in enumerate(ARMS):
             m, per = macro_auc(truth, probs[i])
             scores["arms"][a["name"]] = {
@@ -1246,6 +1254,16 @@ def main():
                            "per_finding": {f: round(bper[k], 4) for k, f in enumerate(LAB)}}
         print(f"[gold] BLEND macro {bm:.4f} | best single {best:.4f} | "
               f"gain {bm - best:+.4f}", flush=True)
+        for _nm, _pr in v1_members.items():
+            _m, _per = macro_auc(truth, _pr)
+            scores["arms"][f"v1:{_nm}"] = {
+                "macro": round(_m, 4), "author_gold_auc": None,
+                "delta_vs_author": None,
+                "per_finding": {f: round(_per[k], 4) for k, f in enumerate(LAB)}}
+            print(f"[gold] v1 member {_nm:28s} macro {_m:.4f}", flush=True)
+            rows.append(pd.DataFrame(
+                {"StudyInstanceUID": ids, "arm": f"v1:{_nm}",
+                 **{f: _pr[:, k].astype(np.float32) for k, f in enumerate(LAB)}}))
         if v1_probs is not None:
             vm, vper = macro_auc(truth, v1_probs)
             scores["arms"]["v1"] = {
@@ -1257,14 +1275,13 @@ def main():
             print("[gold] NOTE: a FULL-FIT v1 member trained on all 58 gold "
                   "studies, so this number is contaminated upward and is a "
                   "plumbing check, not a score.", flush=True)
-        rows = []
         for i, a in enumerate(ARMS):
             d = pd.DataFrame(probs[i].astype(np.float32), columns=list(LAB))
             d.insert(0, "arm", a["name"])
             d.insert(0, "StudyInstanceUID", ids)
             rows.append(d)
         out = pd.concat(rows, ignore_index=True)
-        assert len(out) == len(ids) * len(ARMS)
+        assert len(out) == len(ids) * (len(ARMS) + len(v1_members))
         out.to_csv("/kaggle/working/gold_probs.csv", index=False)
         truth_df = pd.DataFrame(truth.astype(np.int8), columns=list(LAB))
         truth_df.insert(0, "StudyInstanceUID", ids)

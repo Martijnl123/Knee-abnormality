@@ -1762,6 +1762,62 @@ EXTRAS = [
                                  lr=6e-4, seed=3).constants()},
         note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
     ),
+    # E104's READOUT. Both label arms scored on the 58, in ONE run, separately.
+    #
+    # The gold dump emits one block per v1 member rather than their average,
+    # which is the whole reason this is one kernel and not two: averaging the two
+    # arms would answer nothing, and running them separately would pay for the
+    # CoAtNet pass twice.
+    #
+    # The four CoAtNet arms ride along as the control. They have read
+    # 0.9198 / 0.9170 / 0.9167 / 0.9116 on four consecutive runs; a fifth
+    # confirms this run is measuring the same instrument, and their column is
+    # what the winning label arm gets blended against afterwards.
+    Kernel(
+        slug="knee-gold-labarms",
+        directory="90_gold_labarms",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        depends=["knee-train-lab-dread", "knee-train-lab-pub4349"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": 2,
+            "V1_BATCH_STUDIES": V1.infer_batch,
+            "V1_SLICE_SUBSAMPLE": None,
+            "V1_INPUT_NORM": False,
+            "CHECKPOINT_GLOB": "checkpoint_fold*.pt",
+            "SKIP_DIRECTORIES": Raw('{"train_series", "test_series"}'),
+            **V1.constants(),
+            "PLANES": ("Sagittal", "Coronal", "Axial"),
+        },
+        note="NOT A SUBMISSION. Scores E104's two label arms on the 58 gold\n"
+             "studies, separately, with the four CoAtNet arms as the control.\n"
+             "\n"
+             "THIS IS AN HONEST NUMBER FOR A FULL-FIT MODEL, which this\n"
+             "project has never had. Both arms trained on 4,349 studies and\n"
+             "both logs print `gold studies in cache: 0` - the label sets\n"
+             "contain no gold rows, so the 58 were never in training.\n"
+             "\n"
+             "Read the two `[gold] v1 member` lines. The pre-registered rule\n"
+             "is E104's: a gap under 0.015 is NOT SEPARATED, because E031\n"
+             "puts gold-58's absolute interval at +/-0.0153. A point estimate\n"
+             "is not a tie-break.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`; labels from\n"
+             "`dreaddevelopment/rsna-knee-labels` and\n"
+             "`stevenleehans/rsna-knee-llm-report-labels`, both CC0-1.0.",
+    ),
     # TWELVE ARMS FROM THREE FILES, TO PRICE TTA THE WAY E101 PRICED PARTNERS.
     #
     # E099's instrument turned "what blend?" from a board submission into

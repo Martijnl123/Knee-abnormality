@@ -303,7 +303,18 @@ def main() -> int:
     # column that climbs to 0.99 invites exactly the misreading this project
     # has made most often: a number that is not a score, read as one. E064's
     # full-fit member had to be explained twice for the same reason.
-    if full_fit:
+    if full_fit and not is_gold.any():
+        # E104's case, and the message above is exactly WRONG for it. A label set
+        # that contains no gold rows leaves the 58 out of the cohort entirely, so
+        # a full fit over everything it does contain has still never seen a gold
+        # study. Zero gold positions then means "none exist here", not "all of
+        # them are in training" — the opposite reading, on the same number. Say
+        # which, or a later reader concludes a clean holdout was contaminated.
+        print("gold studies in the cohort: 0 — the label set has no gold rows, "
+              "so the 58 are OUTSIDE training by construction. This full fit is "
+              "honestly scoreable on them; there is no gold column below because "
+              "there is no gold here, not because it is all in training.")
+    elif full_fit:
         print(f"gold studies in the monitor set: {len(gold_positions)} "
               "— IN TRAINING, held out from nothing. Any gold figure below is "
               "memorisation, not a score.")

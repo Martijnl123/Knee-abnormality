@@ -124,8 +124,13 @@ def test_the_gold_dump_is_raw_per_arm_probabilities_not_the_blend():
     degenerate member inside it — the exact failure E091 found in
     `prediction_spread`."""
     src = GENERATED.read_text()
-    i = src.index("rows = []")
-    j = src.index("out.to_csv", i)
+    # Anchor on the CoAtNet dump loop itself. `rows` is now declared earlier so
+    # that v1 members can append to it too, and slicing from there would sweep in
+    # the blend arithmetic that sits between.
+    # There are two `enumerate(ARMS)` loops in the gold branch -- one scores, one
+    # dumps. Anchor on the dump's own first line, not on the loop header.
+    i = src.index("d = pd.DataFrame(probs[i]")
+    j = src.index("out = pd.concat(rows", i)
     assert "probs[i]" in src[i:j], "the dump is not reading raw per-arm probabilities"
     assert "ranks" not in src[i:j], "the dump is reading the rank blend"
 
