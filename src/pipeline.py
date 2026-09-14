@@ -2019,10 +2019,14 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 5,
-            # See the template: gold-58 supports moving BELOW 0.50 (P = 0.972)
-            # but cannot separate which value. 0.40 sits between the bootstrap
-            # median 0.35 and the board-score ratio 0.497.
-            "V1_BLEND_W": 0.40,
+            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
+            # 0.938 — the same three decimals as 0.50, on a board that resolves
+            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
+            # no evidence either way and restores the default, because 0.50
+            # needs no justification and 0.40 is a number fitted on 58 studies.
+            # Keeping a fitted parameter that demonstrated nothing would be the
+            # seventh refusal quietly not happening.
+            "V1_BLEND_W": 0.50,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
@@ -2078,10 +2082,14 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 5,
-            # See the template: gold-58 supports moving BELOW 0.50 (P = 0.972)
-            # but cannot separate which value. 0.40 sits between the bootstrap
-            # median 0.35 and the board-score ratio 0.497.
-            "V1_BLEND_W": 0.40,
+            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
+            # 0.938 — the same three decimals as 0.50, on a board that resolves
+            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
+            # no evidence either way and restores the default, because 0.50
+            # needs no justification and 0.40 is a number fitted on 58 studies.
+            # Keeping a fitted parameter that demonstrated nothing would be the
+            # seventh refusal quietly not happening.
+            "V1_BLEND_W": 0.50,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,

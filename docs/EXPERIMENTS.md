@@ -6436,7 +6436,7 @@ exactly the contribution the proxy is blind to by construction.
   asset is what made this diagnosis possible at all, and it outlives the entry.
 
 
-### E107 — the one fitted number, and the reason it is allowed now
+### E107 — the one fitted number bought nothing, and the transfer ratio has a boundary
 - **date**: 2026-09-14. CPU only. One submission queued. `V1_BLEND_W` 0.50 → 0.40
   in `knee-infer-raptorv1`.
 
@@ -6495,3 +6495,41 @@ but it is not zero, and it points the other way.
   can judge it. A 0.936–0.940 result is the most likely single outcome and is
   explicitly *not* a licence to keep 0.40.
 - **cost**: one submission, ~3 h of kernel time, no new asset, no training.
+
+**RESULT (2026-09-14). 0.938 — THE SAME THREE DECIMALS AS 0.50.**
+
+| weight | board |
+|---|---:|
+| 0.50 (default, unfitted) | **0.938** |
+| 0.40 (fitted on gold-58) | **0.938** |
+
+  The middle bracket, and **`V1_BLEND_W` is reverted to 0.50 by this entry's own
+  rule**: no evidence either way restores the default, because 0.50 needs no
+  justification and 0.40 is a number fitted on 58 studies. Keeping it would be
+  the seventh refusal quietly not happening.
+
+**AND IT IS A SHARPER NULL THAN THE BRACKET REQUIRED.** The board resolves to
+0.001 and this did not move it at all, from a change that shifted the gold macro
+by +0.0016 and altered individual study predictions by up to **0.1**. A real
+effect could still hide under the rounding — +0.0004 would print as 0.938 — but
+nothing larger can.
+
+**THE USEFUL FINDING IS A BOUNDARY ON E105's RATIO.** Gold→board was measured at
+1.6× (E097) and 2.0× (E105), and **both were composition changes — adding
+members to a blend**. Applied here it predicted +0.0016 gold → ~+0.003 board,
+which would have printed 0.941. It printed 0.938.
+
+- **so the ratio describes adding a decorrelated member and does not extend to
+  re-mixing the members already present.** That is not a small caveat: the ratio
+  was about to be used as a general converter for every offline reading in this
+  log. **It applies to what it was measured on and nothing else**, and this entry
+  is the boundary marker.
+- **gold-58 failed on the one parameter it was best placed to estimate.** It has
+  58 studies, a single scalar, a paired design and a bootstrap that put
+  P(optimum ≤ 0.50) at 0.972 — and the board saw nothing. Combined with E106
+  (the report-label proxy is anti-informative for model choice) and E101 (gold's
+  paired CI is ±0.006 at best), **this project now has no offline instrument that
+  can tune a blend.** Composition can be measured; mixing cannot.
+- **what was right about running it**: the cost of being wrong really was zero.
+  0.938 stayed banked, one of five daily slots was spent, and a question that had
+  been argued six times is now answered on the only instrument that counts.
