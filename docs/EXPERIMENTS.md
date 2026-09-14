@@ -6195,3 +6195,88 @@ decorrelated member, measured against the same CoAtNet column:
   transferable result. It does not pay here only because the label arms are
   individually weaker and closer to CoAtNet — but it is the first measurement in
   this log of *where model diversity actually comes from*.
+
+
+### E105 — 0.938. The blend transferred at twice what gold predicted, and that ratio closes three routes for free
+- **date**: 2026-09-14. One submission (`knee-infer-raptorv1`, submitted 2026-09-13
+  22:53). **Board 0.938**, from 0.932. Rank **760 / 3,723**, from 1212.
+
+**THE PRE-REGISTRATION'S TOP BRACKET.** E101 fixed four outcomes before the run;
+this is *">0.935 — the offline sweep transferred and then some"*. Gold predicted
+**+0.0030** at the shipped 50/50 weight. The board paid **+0.006**.
+
+**AND THAT IS THE SECOND CALIBRATION POINT ON THE INSTRUMENT.**
+
+| | gold said | board said | ratio |
+|---|---:|---:|---:|
+| E097, four CoAtNet arms vs one | +0.0025 | +0.004 | 1.6× |
+| **E105, CoAtNet + v1 vs CoAtNet** | **+0.0030** | **+0.006** | **2.0×** |
+
+  **gold-58 understates a real blend gain by roughly 1.8×.** Two points is not a
+  law and it is recorded as a working ratio, not a constant — but it is the first
+  time this project can convert an offline reading into a board expectation at
+  all, and it immediately changes what "not separated" is worth. **It does not
+  make a negative reading positive; it makes a small positive one worth checking.**
+
+**SO THE THREE CLOSURES WERE RE-CHECKED AT 1.8×, AND ALL THREE STAY CLOSED.**
+
+1. **TTA, re-measured where it matters.** E103 priced TTA against the CoAtNet
+   arms *alone*. The question that matters is TTA on the CoAtNet half **of the
+   blend that actually scored 0.938**:
+
+   | CoAtNet half | + v1 at 50/50 | vs shipped |
+   |---|---:|---:|
+   | published 4 — the 0.938 incumbent | 0.9254 | — |
+   | + span jitter ×6 | 0.9246 | **−0.0008** |
+   | + reverse ×2 | 0.9237 | **−0.0017** |
+   | + both, 12 arms | 0.9247 | **−0.0007** |
+
+   **Negative on all three.** E103's +0.0026 alone does not survive contact with
+   the v1 arm — the v1 arm was already supplying the diversity the extra CoAtNet
+   members were pretending to add. **TTA is closed for good, and no submission was
+   spent finding out.**
+
+2. **THE CC0 CHECKPOINT ROUTE IS CLOSED WITHOUT RUNNING IT.** E043 queued
+   *"run inference from the CC0 sources directly — `pilkwang/rsna-knee-weights`"*
+   and it was never done; with quota open it was the obvious spend. It is not
+   needed. `pilkwang`'s manifest describes **20 members, every one
+   `facebook/dinov2-small` at 336 px, one geometry, 5 folds × 4 seeds** — and its
+   published `oof.npz/pred` and `merge_gain.npz/ours` correlate at **0.995**, so
+   the file E098 already scored **is** that arm, ensembled. It reads **0.8400**
+   on gold against the CoAtNet column's 0.9198: a **0.080 gap**, dead centre of
+   E098's six-for-six negative band, whose blend curve E098 already measured as
+   monotonic decline from w=0. **Running the checkpoints would reproduce a system
+   already measured and already negative — ~3 GPU-h and a third preprocessing
+   pipeline, saved by reading a manifest.**
+
+3. **and every other public arm is in the same band.** RadImageNet 0.8576 (E100),
+   `mattiaangeli` lineage 0.8576 (E042), `merge_gain/imported` 0.7924.
+   **Everything public and reachable sits at 0.79–0.86 against our 0.92.** The
+   0.936–0.939 public systems do not get there on any single arm; they get there
+   by combining four weak ones. **This project is at 0.938 with two strong ones.**
+
+**THE ORACLE BOUND, so the next idea is priced before it is built.** Best
+per-finding blend weight for the two shipped arms, **chosen by looking at the
+answers** on the 58 — an upper bound no honest scheme can reach:
+
+| | gold |
+|---|---:|
+| shipped, uniform 0.5 | 0.9254 |
+| **oracle per-finding weights** | **0.9330** |
+| headroom | **+0.0076** → ~+0.014 board → **ceiling ≈ 0.952** |
+
+  **Where the headroom is, is the useful part.** Three findings want the v1 arm
+  at weight **zero** and lose real AUC to the uniform blend: **MCL 0.982 → 0.950
+  (−0.032)**, **Medial Meniscus 0.968 → 0.948 (−0.019)**, ACL −0.004. Those three
+  are **+0.0046 of the +0.0076** — the entire oracle gain is mostly *undoing
+  damage the uniform weight does where CoAtNet is strong and v1 is far behind*,
+  not finding new signal.
+
+- **and that is not a licence to fit twelve weights on 58 studies**, which this
+  log has declined six times. The oracle is an upper bound, and a scheme fitted
+  on 58 studies would capture a fraction of it while risking all of it. What it
+  does license is a **one-sided, non-circular** rule: down-weight the v1 arm on
+  findings its OWN out-of-fold validation (4,407 studies, not the 58) says it is
+  weakest at. That uses the v1 lineage's own data and never touches gold.
+- **cost of this entry**: one submission (already spent) and arithmetic on files
+  already on disk. **Three routes closed, one ceiling established, zero GPU.**
