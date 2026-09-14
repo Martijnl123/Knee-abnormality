@@ -1354,7 +1354,13 @@ def main():
         "gold_scores": scores,
         "prediction_spread": spread}, indent=2))
     print(f"prediction spread: {spread}", flush=True)
-    if EVAL_SPLIT != "gold":
+    if EVAL_SPLIT == "test":
+        # Guarded on the SUBMITTING split by name, not on "not gold". This line
+        # read `!= "gold"` and `trainall` -- a third split added later -- fell
+        # through it and raised UnboundLocalError on `sub`, marking a finished
+        # 6.6 h run as ERROR after its parquet was already on disk. An
+        # allow-list of the one split that builds a submission cannot acquire
+        # that bug again when a fourth split is added.
         print(f"wrote /kaggle/working/submission.csv  rows={len(sub)}", flush=True)
     print(f"DONE {elapsed:.0f}s", flush=True)
 

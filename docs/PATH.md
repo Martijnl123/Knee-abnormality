@@ -22,6 +22,19 @@ old, distrust the priorities below before distrusting the numbers.
 
 ---
 
+
+**RULE ADDED 2026-09-14 (E106): the report labels may TRAIN a model and may not
+RANK one.** Asked to choose a blend weight between the CoAtNet arm and this
+project's v1 arm, the report-label arbiter's optimum was to **delete the v1 arm
+entirely** — the arm measured at **+0.006 on the board**. Its per-finding
+preferences correlate **+0.052** with what the 58 expert studies want, i.e. not
+at all. The mechanism is that the public arms were themselves trained toward
+LLM-parsed report labels, so scoring them on report labels rewards agreement with
+what they were fitted to, and the v1 arm earns its gain exactly where it departs
+from that consensus. **No model-selection decision here may use report labels as
+the judge, at any number of parameters.** Training on them remains correct and
+remains this project's largest single gain (E044, +0.1067).
+
 ## 1. The one number that governs the plan
 
 Decomposed on ground truth, of the **+0.201** from this project's first imaging

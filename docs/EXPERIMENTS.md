@@ -6282,7 +6282,7 @@ answers** on the 58 — an upper bound no honest scheme can reach:
   already on disk. **Three routes closed, one ceiling established, zero GPU.**
 
 
-### E106 — PRE-REGISTERED, NOT YET RUN: a blend weight fitted somewhere the test set is not
+### E106 — a blend weight fitted somewhere the test set is not: the proxy cannot arbitrate between models
 - **date**: 2026-09-14, written **before** the run. `knee-trainall-raptor`, ~5.7
   GPU-h, **no submission**. Quota reopened; ~30 h available.
 
@@ -6361,3 +6361,76 @@ sample.
 - **cost**: ~5.7 h of ~30, one kernel, no submission, no new asset. The v1 side
   already exists: `knee-infer-v1pub`'s five folds cover all 4,407 out-of-fold
   (882+882+881+881+881, verified).
+
+**RESULT (2026-09-14). RULE 1 FAILS AND RULE 3 FIRES, AND RULE 3 IS THE ENTRY.**
+
+The run completed: **4,407 studies, 0 fallbacks, 1.01 s/study**, 6.6 h. (It was
+marked ERROR by a bug of this project's own making — the final log line was
+guarded `if EVAL_SPLIT != "gold"` and `trainall`, added later, fell through it
+and raised `UnboundLocalError` on `sub` **after** the parquet was written. The
+data was never at risk. The guard is now an allow-list of the one split that
+builds a submission, so a fourth split cannot reacquire it.)
+
+| | held-out 58 |
+|---|---:|
+| uniform 0.5 (shipped, board 0.938) | 0.9254 |
+| **skill-above-chance weights, fitted on the 4,349** | **0.9261 (+0.0007)** |
+
+  **+0.0007 against a +0.0030 bar. Does not ship.** But the weights explain
+  themselves: every one landed in **0.42–0.49**, barely off uniform, because
+  CoAtNet beats v1 on all twelve findings by a similar margin and normalising
+  skill above chance compresses that into nothing.
+
+**AND THEN THE DIAGNOSTIC THAT MATTERS, which separates a timid formula from an
+arbiter that does not work.** Give the fit set the **oracle** — the best possible
+per-finding weight by report labels — and test it on gold:
+
+| weights | gold |
+|---|---:|
+| uniform 0.5 | 0.9254 |
+| **oracle fitted on the 4,349 (report labels)** | **0.9242 (−0.0012)** |
+| oracle fitted on the 58 themselves | 0.9335 (+0.0081), unattainable |
+
+  **Correlation between the two weight vectors: +0.052.** Mean absolute
+  difference 0.283. **The proxy's per-finding preferences are uncorrelated with
+  what the expert labels actually want** — so no formula over that arbiter could
+  have worked, however clever. The formula was not the problem.
+
+**THE SCALAR CASE MAKES IT UNMISTAKABLE.** One parameter instead of twelve, same
+protocol — choose on the 4,349, test on the 58:
+
+```
+w_v1    report-label macro (4,349)     gold macro (58)
+0.00                        0.9160              0.9224   <- the proxy's choice
+0.30                        0.9077              0.9275   <- gold's choice
+0.50                        0.8947              0.9254   <- shipped, board 0.938
+1.00                        0.8404              0.8980
+```
+
+  **The report labels rank the blend monotonically worse as the v1 arm is added,
+  and their optimum is to delete it entirely.** That arm is worth **+0.006 on the
+  board** (E105). Following the proxy would have cost −0.0029 on gold and, at the
+  measured 1.8× ratio, roughly **−0.005 on the leaderboard.**
+
+**THE MECHANISM, AND WHY IT GENERALISES.** The CoAtNet arm's authors trained it
+toward LLM-parsed report labels. Scoring it against report labels therefore
+rewards it for agreeing with the thing it was fitted to. **The v1 arm earns its
++0.006 precisely where it departs from the report-label consensus**, and that is
+exactly the contribution the proxy is blind to by construction.
+
+- **so the report-label proxy can TRAIN models and cannot RANK them.** E044
+  measured +0.1067 from switching to these labels; E093 flagged the proxy's
+  validity as unverified on a correlation (Spearman 0.573) without a mechanism.
+  **This supplies the mechanism and the boundary**: training averages over 4,407
+  studies and tolerates label noise; arbitration reads the fine structure of
+  which model is better where, and that fine structure is the part that is wrong.
+  **`PATH.md` and any future entry must not use report labels to choose between
+  models, at any number of parameters.**
+- **the +0.0076 oracle headroom is real and unreachable.** Gold-58 cannot fit
+  twelve parameters on 58 studies; the only larger arbiter available points the
+  wrong way. **Per-finding weighting is closed — not because the idea is wrong,
+  but because this project has no instrument that can find the weights.**
+- **what the 6.6 GPU-h bought besides a negative**: `trainall_probs.parquet`,
+  the four CoAtNet arms on all 4,407 studies. Every future question about this
+  arm — any partner, any weight, any scheme — is now arithmetic on a file. That
+  asset is what made this diagnosis possible at all, and it outlives the entry.
