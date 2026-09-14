@@ -1242,7 +1242,14 @@ def main():
         ranks = (1.0 - V1_BLEND_W) * coat_r + V1_BLEND_W * v1_r
         agree = float(np.mean([np.corrcoef(coat_r[:, k], v1_r[:, k])[0, 1]
                                for k in range(len(LAB))])) if len(ids) > 2 else float("nan")
-        print(f"[blend] + v1 arm at 0.5/0.5 | mean cross-architecture rank "
+        # The weight is INTERPOLATED, not spelled out. This line read a literal
+        # "0.5/0.5" and survived E107 changing the constant to 0.40 -- the math
+        # was right and the log said otherwise, which is the same failure the
+        # trainer's gold message had two days ago: a correct number reported
+        # under the wrong description. A reader would have concluded the change
+        # never took effect.
+        print(f"[blend] + v1 arm at {1 - V1_BLEND_W:.2f}/{V1_BLEND_W:.2f} "
+              f"(coat/v1) | mean cross-architecture rank "
               f"correlation {agree:.3f} (E101 measured 0.793 on gold; CoAtNet's "
               f"own four arms sit at 0.905-0.986)", flush=True)
 
