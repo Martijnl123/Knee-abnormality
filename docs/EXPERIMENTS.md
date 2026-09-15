@@ -6880,7 +6880,7 @@ was rejected in its favour.
   them.
 
 
-### E112 — PRE-REGISTERED, NOT YET RUN: upstream's arm weights have never been tested here
+### E112 — upstream's arm weights survive their first test here, and the reverse arm is confirmed near-worthless
 - **date**: 2026-09-15, written **before** the fit. CPU only, **no GPU, no
   submission**, on files already on disk.
 
@@ -6920,3 +6920,51 @@ fit set is not the risk — transfer is.
 - **cost**: zero GPU, zero submission. Everything needed is already on disk:
   `trainall_probs.parquet` (four arms × 4,407 studies, E106) and the competition's
   own `train.csv`.
+
+**RESULT (2026-09-15). RULE 2. UPSTREAM'S WEIGHTS STAND — AND NOW THEY STAND
+MEASURED.**
+
+| | fit set (4,349) | **held-out 58** |
+|---|---:|---:|
+| upstream **0.55 / 0.20 / 0.15 / 0.10** | 0.9160 | **0.9224** |
+| fitted on the 4,349 | 0.9168 | **0.9248** |
+| difference | +0.0008 | **+0.0024** |
+
+  **+0.0024 against a +0.0030 bar: it does not ship.** The fit barely moved its
+  own objective either — **+0.0008 on 4,349 studies with three free parameters**,
+  which is what "already near-optimal" looks like from the inside.
+
+  **Rule 3 passes**: the largest fitted weight is **0.562**, so nothing collapsed
+  onto a single arm and the E106 self-agreement failure did not recur.
+
+**AND E107's BOUNDARY FORBIDS RESCUING IT WITH THE RATIO.** +0.0024 gold is
+tempting to convert at the 1.6–2.0× gold→board factor and call it +0.004. **E107
+established that factor applies to *adding a member* and NOT to re-mixing members
+already present** — it predicted 0.941 for a weight change and the board printed
+0.938. This is a mixing-weight change. **The conversion is not available here, by
+a rule this log wrote two entries ago.**
+
+**THE SUB-FINDING IS THE INTERESTING PART: the reverse arm is near-worthless, and
+two independent instruments now say so.**
+
+| | `maxspan-v5-reverse` |
+|---|---|
+| upstream's published weight | **0.15** |
+| weight fitted on 4,349 report-labelled studies | **0.021** |
+| E103, correlation with its own parent on gold-58 | **0.986** |
+
+  E103 found it correlates 0.986 with `maxspan-v5` — a near-duplicate that
+  cannot add information. **This fit, on a different instrument and 75× the
+  sample, independently drives its weight to almost nothing.** Two arbiters that
+  disagree about most things agree about this one.
+
+- **so upstream's four-arm blend is carrying a member that contributes
+  essentially nothing**, and it is *their* member at *their* weight. Dropping it
+  is not worth a submission on this evidence (+0.0024 total, and the reverse arm
+  is only part of that), but it is the first thing to reach for if a future
+  change makes the CoAtNet half worth revisiting.
+- **what rule 2 was for.** A null here is not a wasted twenty minutes: the one
+  set of numbers in this pipeline fitted by someone else, on data this project
+  has never seen, has now been checked against 4,349 of its own studies and
+  held. **Inherited and measured are different states even when the number is
+  the same.**
