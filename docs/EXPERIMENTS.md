@@ -6878,3 +6878,45 @@ was rejected in its favour.
   mounted — because a test pinning a number it does not care about turns every
   legitimate edit into a failure and teaches people to edit tests without reading
   them.
+
+
+### E112 — PRE-REGISTERED, NOT YET RUN: upstream's arm weights have never been tested here
+- **date**: 2026-09-15, written **before** the fit. CPU only, **no GPU, no
+  submission**, on files already on disk.
+
+**THE UNTESTED ASSUMPTION.** The CoAtNet half of the shipped blend uses
+**0.55 / 0.20 / 0.15 / 0.10** across `maxspan-v5`, `native384-v8`,
+`maxspan-v5-reverse`, `native384dense-v10`. Those are **upstream's published
+weights, fitted on upstream's data and upstream's split** (E088). They have been
+carried unexamined since E097 and they are the only numbers in the pipeline that
+were fitted by someone else on data this project has never seen.
+
+**WHY IT IS ASKABLE NOW AND WAS NOT BEFORE.** E106 established that report labels
+are anti-informative for weighting **across architectures** (+0.052 agreement
+with gold). E108 established they rank **within a checkpoint family** at
+**+0.800**. **These four arms are one family** — three checkpoints, one author,
+one training run each — so this sits in the regime where the arbiter was
+validated, not the regime where it failed. That distinction is the entire licence
+for this entry and if it is wrong the result is worthless.
+
+**THE PROTOCOL, identical to E106's.** Fit the four weights on the **4,349
+non-gold studies** against the report labels; test on the **58 gold**, which the
+fit never sees. Three free parameters against 4,349 studies, so overfitting the
+fit set is not the risk — transfer is.
+
+**ACCEPTANCE, FIXED NOW.**
+
+1. **Fitted weights beat upstream's on the held-out 58 by > +0.0030 gold** → worth
+   a submission. At the board floor of ±0.003 anything smaller cannot be read.
+2. **Not separated, or worse** → upstream's weights stand, and they stand
+   *measured* rather than inherited, which is worth the twenty minutes on its
+   own.
+3. **If the fitted weights collapse onto one arm** (any weight > 0.90) that is a
+   sign the proxy is rewarding agreement with itself again, as in E106, and the
+   result is void regardless of the gold number.
+4. **gold-58 is the test set and is not consulted during the fit.** The same
+   `gold_mask` guard E106 uses applies.
+
+- **cost**: zero GPU, zero submission. Everything needed is already on disk:
+  `trainall_probs.parquet` (four arms × 4,407 studies, E106) and the competition's
+  own `train.csv`.
