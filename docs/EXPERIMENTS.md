@@ -6710,3 +6710,55 @@ previous one-fold architecture probe here was unreadable.
   Labels and data are +0.166 of this project's +0.201 and that decomposition is
   not in question — what is in question is whether a line written under
   0.107-worse labels should still be steering decisions.
+
+
+### E110 — RECOVERED FROM AN ABANDONED BRANCH: plane attribution, tested and not surviving
+- **date of the work**: 2026-08-20. **Recovered into `main` 2026-09-15.**
+- **provenance, because it matters**: this result lives on
+  `origin/rsna-knee-abnormality-pipeline`, a line that diverged on 2026-08-20 and
+  was abandoned. That branch's log is 1,166 lines against `main`'s 6,712 and
+  merging it produces **8 conflicts** in files rewritten many times since, so the
+  code is deliberately NOT merged. **The finding is ported as text; the branch
+  stays as its archive.** It was numbered E031 there, which collides with a
+  different E031 here — the collision is why it is renumbered rather than
+  slotted in.
+
+**THE IDEA.** The cache gives three planes and the model pools all sixty slices
+together, treating them as interchangeable. Anatomy says otherwise: an ACL is
+read on oblique sagittal, the MCL is coronal, the patellofemoral joint is axial.
+If a finding lives in one plane, pooling three dilutes it threefold.
+
+**THE ATTRACTIVE FIRST RESULT.** One head per plane over frozen embeddings:
+**5 of 12 findings scored higher on a single plane than on all three pooled, mean
+advantage +0.082.**
+
+**AND IT WAS SELECTION BIAS.** Picking each finding's best plane after seeing the
+results is fitting 12 × 3 choices to 58 studies. Naming the plane from **anatomy
+first**, fixed before the comparison ran:
+
+| | macro |
+|---|---:|
+| pre-specified anatomical plane per finding | 0.6113 |
+| all three planes pooled | **0.6314** |
+| **paired delta** | **−0.0201**, 95% CI [−0.063, +0.025] |
+
+  **Not separated, and pointing the wrong way. The pattern was noise dressed as
+  anatomy.**
+
+- **held loosely**: the least ambiguous anatomical call is the MCL, a coronal
+  ligament — 0.599 coronal against 0.478 pooled. But that finding has **9
+  positives among 58 studies**, so it is a reason to re-test on better features,
+  not a result.
+- **WHAT THIS DOES NOT SETTLE, and why it may be stale in the same way E109's
+  subject is.** It ran on **frozen ImageNet embeddings** scoring 0.63 overall and
+  at chance on several findings, and **before the label change worth +0.1067**
+  (E041/E044). So it is *"unsupported on these features"*, not *"refuted"* —
+  exactly the caveat its own author wrote, and exactly the staleness E109 is
+  currently testing on the architecture claim.
+- **the tool that produced it, `eda/plane_ablation.py`, is not in `main`** and is
+  only on that branch. A re-test would need it back or rewritten.
+- **why it is in the log at all**, in its author's words: the first draft of the
+  entry would have read *"5 of 12 findings prefer a single plane, mean +0.082, a
+  learned per-finding plane weight is 36 parameters"* — the exact shape of the
+  confident claim this project has retracted repeatedly. **The test that killed it
+  cost four minutes.**

@@ -64,6 +64,7 @@ brackets is the experiment.
 | Blend mixing weight (E107) | 0.40 vs 0.50 scored **identically to three decimals**. |
 | Narrower inference span (E108) | Looked like a winner on 58 studies (+0.0055); on 4,349 it is **−0.0068**. Detail in §5 — it is the most instructive failure in the log. |
 | Architecture (E012–E024) | **This one is being re-opened right now.** See §6. |
+| Per-plane attribution (E110) | Looked like +0.082 across 5 of 12 findings; naming the plane from anatomy *before* looking scored **−0.0201** against pooling. Selection bias. Caveat: measured on frozen features under the old labels, so "unsupported", not "refuted". |
 
 ---
 
@@ -216,3 +217,18 @@ anything load-bearing gets re-read rather than inherited.
 
 If a number here matters to a decision you are about to make, check when it was
 measured before you use it.
+
+---
+
+## 10. One thing that is NOT in main, on purpose
+
+`origin/rsna-knee-abnormality-pipeline` is an abandoned branch from 2026-08-20
+with 5 commits that never merged. Its code is **deliberately not merged** — it
+diverged before most of the current pipeline existed and produces 8 conflicts in
+files rewritten many times since.
+
+Its one finding that `main` lacked has been **ported as text** (E110, the plane
+attribution result), and the tool that produced it,
+`eda/plane_ablation.py`, exists **only on that branch**. If you ever want to
+re-test per-plane heads on the current features and labels, get the tool from
+there rather than rewriting it — but do not merge the branch.
