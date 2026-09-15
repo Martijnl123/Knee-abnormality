@@ -1,14 +1,23 @@
 # What is left, what it is worth, and what 0.95 actually requires
 
-Standing: **0.932 on the leaderboard** (2026-09-11, the CC0 CoAtNet arm at four
-published weights, E097), previously 0.928 and 0.926 (2026-09-07, E083 — five full-fit
-members), up from 0.924, 0.923, 0.846 and 0.725.
-Leaderboard top **0.954**. **3,332 teams.** Final submission **2026-10-22**.
+Standing: **0.938 on the leaderboard** (2026-09-14, `knee-infer-raptorv1` — the
+four CC0 CoAtNet arms blended 50/50 with five full-fit resnet34 members, E105),
+previously 0.932 (E097), 0.928, 0.926, 0.924, 0.923, 0.846 and 0.725.
+Leaderboard top **0.957**. **3,769 teams.** Final submission **2026-10-22**.
 
-**Rank ~1,166 of 3,332, measured 2026-09-08 11:05 UTC (E088)** — 1,104 of 3,263
-a day earlier (E085), #866 of 1,866 on 2026-09-02 (E070). The field grew 75% in
-five days and 69 teams overnight. **A rank is a measurement with a date on it**,
-and this one decays whether or not the score moves.
+**Rank 798 of 3,769, measured 2026-09-15 07:10 UTC** — **760 of 3,723 the day
+before, on the same score.** 46 teams joined overnight and passed us. Earlier:
+~1,166 of 3,332 (E088, 2026-09-08), 1,104 of 3,263 (E085), 866 of 1,866 (E070).
+**A rank is a measurement with a date on it**, and this one decays whether or not
+the score moves.
+
+**The wall above is dense and then it is not.** 837 teams at ≥0.938, 706 at
+≥0.940, 537 at ≥0.941 — but only **81 at ≥0.945**. ~720 teams live inside 0.007
+of AUC above us; the cliff is at about 0.943.
+
+**New to this repo? Read `COMMENTS_FOR_MARTIJN.md` at the root first**, then
+`docs/EXPERIMENTS.md` backwards from E109. Those two are current. Everything
+else in `docs/` is older than the standing score.
 
 **461 teams sit at exactly 0.936 and 165 at exactly 0.939**, forks of public
 notebooks, so the free public baseline is 0.010+ ahead of this project's
@@ -17,8 +26,11 @@ this file claimed for a week — corrected in §2.0.** And §4 now answers the 0
 question with the field's own shape: **the best available fork lands at 0.939**,
 so 0.95 is not a gap that acquiring anything closes.
 
-Last rewritten 2026-09-08 (E088). If this header ever reads more than a week
-old, distrust the priorities below before distrusting the numbers.
+Header refreshed 2026-09-15. **The PRIORITIES below it were written 2026-09-08
+and nine of their routes have since closed on measurements** (E098-E108) — the
+scoreboard numbers above are current, §2's plan is not. `COMMENTS_FOR_MARTIJN.md`
+§3 lists what is dead and why. If this header ever reads more than a week old,
+distrust the priorities below before distrusting the numbers.
 
 ---
 

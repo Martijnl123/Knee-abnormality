@@ -1835,8 +1835,17 @@ EXTRAS = [
         datasets=[PUBLIC_DATASET],
         constants={"RUN_FOLD": 0,
                    **V1.constants(),
-                   **TrainConfig(backbone="convnext_tiny", epochs=24, batch=16,
-                                 lr=6e-4, input_norm=True, seed=3).constants()},
+                   # batch 4 x 4 accumulation = the SAME effective batch of 16
+                   # the control uses. convnext_tiny OOMed the T4 at batch 16
+                   # (each study is 3 planes x 20 slices = 60 images, so a batch
+                   # of 16 is 960 forward passes of activations). Accumulation is
+                   # EXACTLY equivalent here rather than approximately: convnext
+                   # normalises with LayerNorm, which is per-sample, so unlike a
+                   # BatchNorm backbone the split carries no batch-statistics
+                   # difference. The comparison stays one-variable.
+                   **TrainConfig(backbone="convnext_tiny", epochs=24, batch=4,
+                                 accum=4, lr=6e-4, input_norm=True,
+                                 seed=3).constants()},
         note="Retests the oldest standing claim in this project: that\n"
              "architecture has measured zero, every time.\n"
              "\n"

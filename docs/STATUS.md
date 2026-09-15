@@ -7,6 +7,12 @@ axis here is not topic. It is *evidence strength*.
 
 Last updated 2026-09-07 (E087, and E086 still open).
 
+> **STALE AS OF 2026-09-15.** Everything below predates E088-E109, which is two
+> weeks and nine closed routes. The board has moved 0.926 → 0.932 → **0.938** and
+> the rank from ~1,166/3,332 to **798/3,769**. Do not take an evidence grade in
+> this file as current without checking `docs/EXPERIMENTS.md` for a later entry
+> on the same claim. **Start at `COMMENTS_FOR_MARTIJN.md` instead.**
+
 ---
 
 ## 1. Results, by what actually established them
