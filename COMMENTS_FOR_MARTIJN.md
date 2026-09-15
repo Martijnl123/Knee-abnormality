@@ -156,8 +156,23 @@ same labels, same fold, different backbone* is an **untested middle case** betwe
 the +0.800 and +0.052 regimes above. The bias argues it cancels. It has not been
 measured for this class.
 
-**Honest expectation: not separated.** That still earns the 4 GPU-h, because the
-line stops being stale either way.
+**OUTCOME (2026-09-15): the primary question was NOT answered.** The convnext arm
+failed twice — CUDA OOM at batch 16, then a host `Killed` at batch 4 with no
+traceback, undiagnosed. **`convnext_tiny` does not run in this harness and I do
+not know why.** The control ran fine at batch 16 on the identical loader, so it
+is the model, not the data path.
+
+**The architecture claim is therefore still UNTESTED, not confirmed.** A failed
+run is not evidence a claim survived. If you pick this up, use **`resnet50` via
+torchvision** rather than convnext — it avoids the timm path entirely, and
+same-family means normalisation stops being a confound.
+
+**The control did settle E020's other confound**, which is worth having:
+ImageNet normalisation **hurts** this lineage by **−0.0064** on fold 0's 882
+studies, CI [−0.0113, −0.0014], P(better) = 0.006. Seed-confounded (incumbent
+`seed=None` vs control `seed=3`), so the direction is supported and the magnitude
+is not clean. It means E020's DINOv2 arm carried a measured handicap its resnet34
+arm did not.
 
 *(The convnext arm OOMed on the first attempt at batch 16 — 3 planes × 20 slices
 = 60 images per study. Refixed as batch 4 × 4 accumulation, the same effective

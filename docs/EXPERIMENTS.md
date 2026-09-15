@@ -6634,7 +6634,7 @@ have endorsed the decision the entire way.**
   as upstream published them.**
 
 
-### E109 — PRE-REGISTERED, NOT YET RUN: the oldest claim in the log, retested under labels it predates
+### E109 — the retest was blocked; what came back is E020's other confound, separated at last
 - **date**: 2026-09-15, written **before** the runs. Two fold-0 trainers,
   ~4 GPU-h of the ~9 remaining. Two CPU evals at **zero** GPU quota. No
   submission.
@@ -6710,6 +6710,59 @@ previous one-fold architecture probe here was unreadable.
   Labels and data are +0.166 of this project's +0.201 and that decomposition is
   not in question — what is in question is whether a line written under
   0.107-worse labels should still be steering decisions.
+
+**RESULT (2026-09-15). THE PRIMARY QUESTION WAS NOT ANSWERED. THE CONTROL
+ANSWERED A DIFFERENT ONE.**
+
+**The convnext arm failed twice and never trained**, so the backbone comparison
+does not exist:
+
+| attempt | config | failure |
+|---|---|---|
+| v1 | batch 16 | **CUDA OOM** — 3 planes × 20 slices is 60 images a study, so a batch of 16 is 960 |
+| v2 | batch 4 × accum 4 (same effective 16) | **`Killed`** — the host OOM killer, before epoch 1, no traceback |
+
+  The second is undiagnosed and is recorded that way. What rules out the easy
+  answers: **the control ran to completion at batch 16** on the identical loader,
+  so the data path is not it, and a *smaller* batch cannot raise host RAM. The
+  difference is the model and the log says nothing more.
+  **`convnext_tiny` does not run in this harness, cause unknown.**
+
+**SO THE ARCHITECTURE CLAIM IS STILL UNTESTED — NOT CONFIRMED.** A failed run is
+not evidence that a claim survived, and the two must not be conflated. `PATH.md`
+§1 now says *stale, retest attempted and blocked* rather than anything stronger.
+
+**WHAT THE CONTROL ARM DID SETTLE, and it is E020's own unresolved confound.**
+E020 compared DINOv2 against resnet34 in August with *"ImageNet normalisation
+on, which the resnet34 runs did not have"* and never separated it. Fold 0's 882
+held-out studies, report labels:
+
+| arm | macro |
+|---|---:|
+| resnet34, `input_norm=False` (the incumbent) | **0.8546** |
+| resnet34, `input_norm=True` | 0.8483 |
+| **paired difference** | **−0.0064**, 95% CI [−0.0113, −0.0014] |
+| P(normalisation better) | **0.006** |
+
+  **ImageNet normalisation HURTS this lineage, and the interval excludes zero.**
+  That is mildly surprising for an ImageNet-pretrained backbone and it vindicates
+  a choice the incumbent made by default rather than by measurement.
+
+- **CONFOUNDED BY SEED, as pre-registered**: the incumbent trained with
+  `seed=None`, the control with `seed=3`. E060 measured a pure reseed at −0.0284
+  on n=58; on 882 studies seed variance is far smaller but not zero. **The
+  direction is supported; the magnitude is not clean.** Recorded before the run,
+  not discovered in it.
+- **and it means E020's comparison was biased in a way nobody had measured.** Its
+  DINOv2 arm carried a setting worth about −0.006 here that its resnet34 arm did
+  not. That does not overturn E020 — DINOv2 *requires* normalisation, so the
+  penalty may not transfer — but **half of the architecture claim rested on a
+  comparison with a measured handicap on one side.**
+- **the control was worth its 1.4 GPU-h even though the treatment died.** It is
+  the arm that existed only because skipping it would have repeated E020's flaw,
+  and it is the only thing this entry delivered.
+- **what it cost**: ~3 GPU-h across three runs, two of them wasted. No
+  submission, no change to the standing 0.938.
 
 
 ### E110 — RECOVERED FROM AN ABANDONED BRANCH: plane attribution, tested and not surviving

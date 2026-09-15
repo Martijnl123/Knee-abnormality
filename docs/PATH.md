@@ -70,7 +70,7 @@ model (0.725) to now (0.926):
 | ensembling, one fold → five | **+0.032** |
 | ~~full fit, at full weight (E083)~~ | **0.000 — inside the board's own seed floor (E092)** |
 | **a distilled teacher (E083)** | **−0.013** |
-| **architecture, every attempt** | **0.000** |
+| **architecture, every attempt** | **0.000 — but measured on or before 2026-08-19, under labels worth −0.1067 (E109). STALE: retest attempted 2026-09-15 and BLOCKED, the convnext arm failed twice. Untested, not confirmed.** |
 
 **CORRECTED 2026-09-10 (E092): full fit's +0.003 does not survive.** A pure
 reseed of the same five-member full-weight ensemble — seeds 11-15 against 3-7,
