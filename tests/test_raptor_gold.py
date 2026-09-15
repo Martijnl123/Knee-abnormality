@@ -1,0 +1,300 @@
+"""Tests for the gold split of the CoAtNet kernel.
+
+E090 recorded that this project has **no offline gold evaluation** for the CC0
+CoAtNet arms — every number about them is their authors' self-report, read out
+of the checkpoint's own `gold_auc` tensor. E097 then bought a board submission
+to learn that four arms beat one by +0.004, and E098 closed six foreign blends
+on an instrument (gold-58) that has never once seen a blend gain and had no way
+to be checked.
+
+`knee-gold-raptorcc0x4` is that check. It runs the identical template against
+the 58 expert-labelled *training* studies and writes a scored dump instead of a
+submission. The failure modes it introduces are new, and these are them:
+
+1. **Writing a submission from training data.** 58 training studies formatted as
+   a submission is a well-formed file that scores against a hidden set it does
+   not contain. The kernel writes no `submission.csv` at all, so the notebook
+   cannot be submitted — asserted here, because a later edit restoring the write
+   would not fail anything else.
+2. **Scoring the wrong 58.** `train.csv` has 4,407 rows and exactly 58 with all
+   twelve findings filled. A schema change that left 57, or that filled the rest
+   with zeros, still produces a plausible AUC. `GOLD_EXPECTED` is asserted
+   against the competition's own file.
+3. **An AUC that is subtly wrong on ties.** A member that returns one value for
+   many studies must score 0.5 on that finding, not whatever `argsort` order
+   happens to give. That is exactly the degenerate case the dump exists to catch,
+   so the tie handling is pinned against hand-computed values.
+
+No patient data: every array here is written for the test.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
+
+from src.pipeline import all_kernels  # noqa: E402
+
+GOLD_SLUG = "knee-gold-raptorcc0x4"
+TEST_SLUGS = ("knee-infer-raptorcc0", "knee-infer-raptorcc0x4")
+GENERATED = REPO_ROOT / "kaggle" / "83_gold_raptorcc0x4" / "run.py"
+
+
+def _kernel(slug):
+    matches = [k for k in all_kernels() if k.slug == slug]
+    assert matches, f"{slug} is not in the manifest"
+    return matches[0]
+
+
+def _load(name):
+    """Pull one function out of the generated kernel by source slicing.
+
+    Importing the module would execute its top-level `import torch, timm`, which
+    is not what is under test and is not installed everywhere this suite runs.
+    """
+    src = GENERATED.read_text()
+    start = src.index(f"def {name}(")
+    end = src.index("\ndef ", start + 1)
+    ns = {"np": np}
+    # `macro_auc` calls `auc`, so the slice has to bring its dependency with it.
+    # Loading them into one namespace also means the test exercises the pair the
+    # kernel actually uses rather than a reimplementation of either.
+    for dep in ("auc", "macro_auc"):
+        d0 = src.index(f"def {dep}(")
+        exec(compile(src[d0:src.index("\ndef ", d0 + 1)], str(GENERATED), "exec"), ns)  # noqa: S102
+    exec(compile(src[start:end], str(GENERATED), "exec"), ns)  # noqa: S102
+    return ns[name]
+
+
+# --------------------------------------------------------------------------- #
+# The split is declared, and the other kernels are not silently switched with it
+# --------------------------------------------------------------------------- #
+def test_the_gold_kernel_declares_the_gold_split():
+    assert _kernel(GOLD_SLUG).constants["EVAL_SPLIT"] == "gold"
+
+
+@pytest.mark.parametrize("slug", TEST_SLUGS)
+def test_the_submitting_kernels_still_declare_the_test_split(slug):
+    """The hazard runs both ways. A default that flipped to "gold" would make the
+    two submission kernels write no submission, which reads on Kaggle as a failed
+    run rather than as a wrong one."""
+    assert _kernel(slug).constants["EVAL_SPLIT"] == "test"
+
+
+def test_the_gold_kernel_mounts_no_extra_dataset():
+    """The gold labels come from the competition's own `train.csv`. If this ever
+    needs a fourth mount, the instrument has stopped being free and something
+    about the split has changed."""
+    assert set(_kernel(GOLD_SLUG).datasets) == set(_kernel("knee-infer-raptorcc0x4").datasets)
+
+
+def test_the_gold_kernel_runs_the_same_four_arms_as_the_submitting_blend():
+    """It is only an instrument for E097's blend if it is E097's blend."""
+    gold = _kernel(GOLD_SLUG).constants["ARMS"]
+    board = _kernel("knee-infer-raptorcc0x4").constants["ARMS"]
+    assert gold == board
+
+
+# --------------------------------------------------------------------------- #
+# It cannot be submitted
+# --------------------------------------------------------------------------- #
+def test_the_gold_branch_writes_no_submission():
+    """Asserted on the generated source, not on the spec, because this is a
+    property of the code path rather than of a constant."""
+    src = GENERATED.read_text()
+    gold_branch = src[src.index('if EVAL_SPLIT == "gold":', src.index("scores = None")):
+                      src.index("    else:\n        sub = pd.DataFrame")]
+    # The literal string appears in the branch's own comment explaining why it is
+    # absent, so what is asserted is the WRITE, not the mention.
+    assert 'to_csv("/kaggle/working/submission.csv"' not in gold_branch, (
+        "the gold branch writes a submission built from 58 TRAINING studies")
+    for artefact in ("gold_probs.csv", "gold_truth.csv", "gold_scores.json"):
+        assert artefact in gold_branch, f"{artefact} is not written"
+
+
+def test_the_gold_dump_is_raw_per_arm_probabilities_not_the_blend():
+    """The whole point is searching blend weights offline. A dump of the blended
+    column cannot answer a question about weights, and `rankpct` would hide a
+    degenerate member inside it — the exact failure E091 found in
+    `prediction_spread`."""
+    src = GENERATED.read_text()
+    # Anchor on the CoAtNet dump loop itself. `rows` is now declared earlier so
+    # that v1 members can append to it too, and slicing from there would sweep in
+    # the blend arithmetic that sits between.
+    # There are two `enumerate(ARMS)` loops in the gold branch -- one scores, one
+    # dumps. Anchor on the dump's own first line, not on the loop header.
+    i = src.index("d = pd.DataFrame(probs[i]")
+    j = src.index("out = pd.concat(rows", i)
+    assert "probs[i]" in src[i:j], "the dump is not reading raw per-arm probabilities"
+    assert "ranks" not in src[i:j], "the dump is reading the rank blend"
+
+
+# --------------------------------------------------------------------------- #
+# The 58
+# --------------------------------------------------------------------------- #
+def test_gold_expected_is_the_fifty_eight_this_project_has_always_scored_on():
+    assert _kernel(GOLD_SLUG).constants["GOLD_EXPECTED"] == 58
+
+
+def test_the_gold_count_is_a_hard_failure_not_a_warning():
+    src = GENERATED.read_text()
+    # The guard is now conditioned on the split -- the `trainall` dump covers
+    # every training study on purpose, so a count of 58 would be wrong there.
+    i = src.index("len(gold) != GOLD_EXPECTED:")
+    assert "raise RuntimeError" in src[i:i + 200]
+    assert 'EVAL_SPLIT != "trainall" and' in src[i - 40:i]
+
+
+# --------------------------------------------------------------------------- #
+# The AUC
+# --------------------------------------------------------------------------- #
+def test_auc_on_a_perfect_and_an_inverted_ranking():
+    auc = _load("auc")
+    y = np.array([0.0, 0.0, 1.0, 1.0])
+    assert auc(y, np.array([0.1, 0.2, 0.3, 0.4])) == pytest.approx(1.0)
+    assert auc(y, np.array([0.4, 0.3, 0.2, 0.1])) == pytest.approx(0.0)
+
+
+def test_a_constant_prediction_scores_one_half_and_not_whatever_argsort_gives():
+    """THE TIE CASE, and the reason the ranks are averaged. A member that
+    collapsed to one value per finding still writes a valid dump; without tie
+    averaging it would score by index order, which on a sorted label column reads
+    as 1.0 and looks like the best arm in the ensemble."""
+    auc = _load("auc")
+    y = np.array([0.0, 0.0, 1.0, 1.0])
+    assert auc(y, np.array([0.5, 0.5, 0.5, 0.5])) == pytest.approx(0.5)
+    # sorted labels, constant predictions: the case that reads 1.0 unguarded
+    y2 = np.array([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
+    assert auc(y2, np.ones(6) * 0.3) == pytest.approx(0.5)
+
+
+def test_auc_handles_a_partial_tie_by_hand_computation():
+    """Two positives and two negatives, one positive tied with one negative.
+    Pairs: (p=0.9 beats both negatives) 2, (p=0.5 beats 0.1) 1 and ties 0.5 -> 0.5.
+    So 3.5 of 4 concordant pairs."""
+    auc = _load("auc")
+    y = np.array([1.0, 1.0, 0.0, 0.0])
+    p = np.array([0.9, 0.5, 0.5, 0.1])
+    assert auc(y, p) == pytest.approx(3.5 / 4.0)
+
+
+def test_auc_is_undefined_rather_than_zero_for_a_single_class_column():
+    auc = _load("auc")
+    assert np.isnan(auc(np.zeros(5), np.arange(5.0)))
+    assert np.isnan(auc(np.ones(5), np.arange(5.0)))
+
+
+def test_macro_auc_is_the_mean_of_the_per_finding_aucs():
+    macro_auc = _load("macro_auc")
+    truth = np.array([[0, 0], [0, 1], [1, 0], [1, 1]], float)
+    # column 0 ranked perfectly; column 1 ranked exactly backwards, which means
+    # every NEGATIVE scoring above every positive -- rows 0 and 2 are the
+    # negatives in column 1, not rows 0 and 1.
+    pred = np.array([[0.1, 0.9], [0.2, 0.2], [0.3, 0.8], [0.4, 0.1]])
+    m, per = macro_auc(truth, pred)
+    assert per == pytest.approx([1.0, 0.0])
+    assert m == pytest.approx(0.5)
+
+
+def test_the_gold_split_refuses_a_single_class_finding():
+    """A finding with one class makes its AUC nan and the macro nan. Failing loudly
+    beats reporting nan as a score."""
+    src = GENERATED.read_text()
+    i = src.index("degenerate = [f for k, f in enumerate(LAB)")
+    assert "raise RuntimeError" in src[i:i + 400]
+
+
+# --------------------------------------------------------------------------- #
+# Test-time augmentation (E103)
+# --------------------------------------------------------------------------- #
+TTA_SLUG = "knee-gold-raptortta"
+
+
+def _tta_arms():
+    return _kernel(TTA_SLUG).constants["ARMS"]
+
+
+def test_every_tta_arm_reuses_a_checkpoint_that_is_already_mounted():
+    """The whole premise is that no new asset is needed. A variant pointing at a
+    fourth file would be a different experiment wearing this one's name."""
+    published = {a["file"] for a in _kernel("knee-infer-raptorcc0x4").constants["ARMS"]}
+    assert {a["file"] for a in _tta_arms()} == published
+    assert len(published) == 3
+
+
+def test_the_four_published_arms_are_carried_unchanged_as_the_control():
+    """E039's rule: the control comes first and it must be the real thing. If the
+    published four do not reproduce their known gold numbers in this run, nothing
+    else in it is readable."""
+    tta = {a["name"]: a for a in _tta_arms()}
+    for arm in _kernel("knee-infer-raptorcc0x4").constants["ARMS"]:
+        here = tta[arm["name"]]
+        for key in ("file", "img", "slots", "span", "k_eval", "reverse", "expect_gold"):
+            assert here[key] == arm[key], f"{arm['name']} differs in {key}"
+
+
+def test_no_arm_is_a_horizontal_flip():
+    """A true left-right mirror is not merely a distribution shift for this label
+    set, it is wrong: Medial/Lateral Meniscus and Medial/Lateral OA are four of
+    the twelve findings, and medial versus lateral is which SIDE of the knee a
+    structure is on. Mirroring a left knee makes it a right knee and swaps them.
+
+    `reverse` is the slice-triplet reversal — `flip(1)` on (K, 3, H, W) — and the
+    template must never grow a `flip(-1)` beside it."""
+    src = (REPO_ROOT / "kaggle" / "87_gold_raptortta" / "run.py").read_text()
+    # Comments stripped first: the template EXPLAINS the mirror it does not do,
+    # and that paragraph is the reason the distinction survived at all.
+    code = "\n".join(line.split("#", 1)[0] for line in src.splitlines())
+    assert "flip(-1)" not in code and "flip(3)" not in code
+    assert "xwins.flip(1)" in code
+    assert all(set(a) >= {"reverse"} and isinstance(a["reverse"], bool) for a in _tta_arms())
+
+
+def test_the_span_jitter_step_is_upstreams_own_and_not_a_fitted_number():
+    """v5 and v10 span (0.02, 0.98); v8 spans (0.06, 0.94). The published arms
+    differ by exactly 0.04 at each end, so 0.04 and 0.08 are upstream's step and
+    twice it. A step chosen by looking at a gold score would be a free parameter
+    fitted to 58 studies."""
+    by_name = {a["name"]: a for a in _tta_arms()}
+    for parent, step in (("maxspan-v5", 0.04), ("maxspan-v5", 0.08),
+                         ("native384dense-v10", 0.04), ("native384dense-v10", 0.08),
+                         ("native384-v8", 0.04), ("native384-v8", 0.08)):
+        lo, hi = by_name[parent]["span"]
+        child = by_name[f"{parent}-span{int(step * 100):02d}"]["span"]
+        assert child == (round(lo + step, 2), round(hi - step, 2)), child
+        assert child[0] < child[1]
+
+
+def test_every_variant_keeps_its_parents_geometry_apart_from_the_one_axis():
+    """One variable at a time. A span variant that also changed `img` would make
+    the axis unreadable, which is the bug E088 caught when all four arms shared
+    one geometry."""
+    by_name = {a["name"]: a for a in _tta_arms()}
+    for name, arm in by_name.items():
+        parent = name.split("-span")[0].removesuffix("-reverse")
+        if parent == name:
+            continue
+        p = by_name[parent]
+        for key in ("file", "img", "slots", "k_eval", "expect_gold"):
+            assert arm[key] == p[key], f"{name} changed {key} as well"
+        changed = [k for k in ("span", "reverse") if arm[k] != p[k]]
+        assert len(changed) == 1, f"{name} changes {changed}, expected exactly one"
+
+
+def test_the_reverse_axis_covers_the_two_checkpoints_upstream_left_out():
+    names = {a["name"] for a in _tta_arms()}
+    assert {"native384dense-v10-reverse", "native384-v8-reverse"} <= names
+    assert "maxspan-v5-reverse" in names, "upstream's own reverse must stay as the control"
+
+
+def test_the_tta_weights_are_flat_because_the_blend_is_searched_offline():
+    """A weighted blend here would be a result nobody asked for. The dump is the
+    deliverable; the kernel's own blend line is a flat average."""
+    assert {a["w"] for a in _tta_arms()} == {1.0}
+    assert _kernel(TTA_SLUG).constants["MEMBERS_EXPECTED"] == len(_tta_arms()) == 12

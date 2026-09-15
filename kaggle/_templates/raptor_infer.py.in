@@ -52,12 +52,40 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
+@@IF V1_MEMBERS@@
+import pandas as pd
+import pydicom
+@@ENDIF V1_MEMBERS@@
 import timm
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 @@CONFIG@@
+
+@@IF V1_MEMBERS@@
+# ---------------------------------------------------------------------------
+# THE SECOND ARCHITECTURE, and why it lives in this file rather than beside it.
+#
+# E101 measured the only union out of eight candidates with an interior optimum:
+# this project's own resnet34 2.5D at 192 px against the CoAtNet arms. Blending
+# them needs BOTH models' predictions on the hidden set in ONE kernel run --
+# `rank_blend`'s own comment records why the obvious alternative cannot work, and
+# the check that enforces it: a mounted kernel supplies its LAST SAVED output,
+# frozen at the 3-study visible run, so a CSV-chained blend submits three rows.
+#
+# So the v1 path is spliced in from the same `_shared` fragments every v1 kernel
+# has always used -- not reimplemented. A second copy of the preprocessing is
+# exactly the silent train/inference skew that E088 caught in this file's first
+# draft, and copying it here to save an include would have reintroduced it.
+#
+# Everything below is INERT unless a kernel declares V1_MEMBERS. Kernels 81, 82
+# and 83 set it to None and run the CoAtNet arms alone.
+# ---------------------------------------------------------------------------
+@@INCLUDE discovery:find_all_markers@@
+@@INCLUDE volume@@
+@@INCLUDE model@@
+@@ENDIF V1_MEMBERS@@
 
 torch.backends.cudnn.benchmark = True
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -192,6 +220,43 @@ def rankpct(x):
 # ============================================================================
 # Study construction from DICOM
 # ============================================================================
+def auc(y, p):
+    """Mann-Whitney AUC with average ranks for ties.
+
+    Written out rather than imported so the gold split scores through arithmetic
+    this repo owns and its tests pin. `rankpct` above already does the ranking
+    the blend needs; this reuses the same tie convention so a member's rank in
+    the blend and its rank in the score cannot disagree.
+    """
+    y = np.asarray(y, np.float64)
+    p = np.asarray(p, np.float64)
+    npos = float((y == 1).sum())
+    nneg = float((y == 0).sum())
+    if npos == 0 or nneg == 0:
+        return float("nan")
+    order = np.argsort(p, kind="mergesort")
+    ranks = np.empty(len(p), np.float64)
+    ranks[order] = np.arange(1, len(p) + 1, dtype=np.float64)
+    # Average the ranks inside every tied run. Without this a member that
+    # returns the same probability for many studies scores by argsort order,
+    # which is arbitrary and flattering.
+    ps = p[order]
+    i = 0
+    while i < len(ps):
+        j = i
+        while j + 1 < len(ps) and ps[j + 1] == ps[i]:
+            j += 1
+        if j > i:
+            ranks[order[i:j + 1]] = (i + j + 2) / 2.0
+        i = j + 1
+    return float((ranks[y == 1].sum() - npos * (npos + 1) / 2.0) / (npos * nneg))
+
+
+def macro_auc(truth, pred):
+    per = [auc(truth[:, k], pred[:, k]) for k in range(truth.shape[1])]
+    return float(np.mean(per)), per
+
+
 def _make_reader():
     import cv2
     import pydicom
@@ -251,7 +316,7 @@ def _pick_series(rows, plane, fluid, used):
     return cands[0] if cands else None
 
 
-def build_study(sid, series, tsdir, reader, img, slots, span):
+def build_raptor_study(sid, series, tsdir, reader, img, slots, span):
     """Fill the fixed slots into one (maxs, img, img) uint8 stack.
 
     GEOMETRY IS PER ARM, not shared. The four published sub-models disagree on
@@ -358,23 +423,127 @@ def main():
             # repeats slices instead of failing.
             raise RuntimeError(f"{arm['name']}: k_eval {arm['k_eval']} > {maxs - 2} usable centres")
     print(f"arms {len(ARMS)} | distinct checkpoints {len(paths)}", flush=True)
+
+@@IF V1_MEMBERS@@
+    # RESOLVE AND FINGERPRINT THE SECOND ARCHITECTURE BEFORE ANY INFERENCE IS
+    # SPENT, for the same reason MEMBERS_EXPECTED is checked above: a bad mount
+    # should cost two minutes, not the seventeen the CoAtNet pass takes first.
+    #
+    # E102 is why the fingerprint is here at all. The five full-fit members
+    # differ only by seed, so they mount in five directories holding a file of
+    # the SAME NAME, and the first plumbing run's log printed `parent.parent` --
+    # the account name -- for all five. Nothing in that log could distinguish
+    # five distinct checkpoints from one found five times, and one model averaged
+    # with itself is a silent 5x smaller ensemble that scores worse and raises
+    # nothing. A count cannot catch it; only identity can.
+    v1_checkpoints = None
+    if V1_MEMBERS:
+        _ck = sorted(path for d in find_all_markers(CHECKPOINT_GLOB)
+                     for path in sorted(d.glob(CHECKPOINT_GLOB)))
+        if len(_ck) != V1_MEMBERS:
+            # A trainer that never ran mounts as an EMPTY directory, so the glob
+            # finds fewer checkpoints, the ensemble runs, and it submits an
+            # experiment nobody declared. E061 verified this by reading a log
+            # after the fact, which is not a guard.
+            raise RuntimeError(
+                f"V1_MEMBERS declares {V1_MEMBERS} checkpoints, mounted "
+                f"{len(_ck)}: {[str(c) for c in _ck]}")
+        _fp = []
+        for _c in _ck:
+            _st = torch.load(_c, map_location="cpu", weights_only=False)
+            _w = {k: v for k, v in _st["model"].items() if k not in ("mean", "std")}
+            _fp.append(float(next(iter(_w.values())).detach().reshape(-1)[:4096].float().sum()))
+            del _st, _w
+        if len(set(_fp)) != len(_fp):
+            raise RuntimeError(
+                f"the {V1_MEMBERS} v1 checkpoints are not all distinct: "
+                f"fingerprints {_fp} from {[str(c) for c in _ck]}. Averaging one "
+                f"model with itself is a smaller ensemble than the manifest "
+                f"declares, and it scores worse without raising anything.")
+        print(f"v1 members {len(_ck)} | distinct weight fingerprints "
+              f"{len(set(_fp))} | {[round(f, 4) for f in _fp]}", flush=True)
+        v1_checkpoints = (_ck, _fp)
+        gc.collect()
+@@ENDIF V1_MEMBERS@@
     for arm in ARMS:
         print(f"  {arm['name']:22s} w={arm['w']:.2f} img={arm['img']} "
               f"slices={sum(int(s[2]) for s in arm['slots'])} span={tuple(arm['span'])} "
               f"k_eval={arm['k_eval']} reverse={arm['reverse']}", flush=True)
 
     root = find_test_root()
-    tsdir = root + "/test_series"
-    if not os.path.isdir(tsdir):
-        tsdir = root + "/test_images"
-    test = pd.read_csv(root + "/test.csv")
-    test["StudyInstanceUID"] = test["StudyInstanceUID"].astype(str)
-    ids = test["StudyInstanceUID"].tolist()
-    tser = pd.read_csv(root + "/test_series.csv")
+    # TWO SPLITS, ONE INFERENCE PATH. `test` is the hidden set and writes a
+    # submission; `gold` is the 58 expert-labelled TRAINING studies and writes a
+    # scored dump instead. They share every line of preprocessing and every
+    # forward pass below deliberately: an instrument that measures these arms
+    # through a different code path than the one that submits them measures a
+    # different system, and E090 recorded that this project has no offline gold
+    # number for the CoAtNet arms at all — only their authors' self-reports.
+    #
+    # The gold split needs NO extra dataset. The competition's own `train.csv`
+    # carries the twelve findings, and exactly 58 of its 4,407 rows have all
+    # twelve filled in; the rest are blank. That set identity is asserted below
+    # rather than assumed, because "58" arriving as 57 or 4,407 would still
+    # produce a plausible-looking AUC.
+    if EVAL_SPLIT in ("gold", "trainall"):
+        tsdir = root + "/train_series"
+        if not os.path.isdir(tsdir):
+            tsdir = root + "/train_images"
+        tr = pd.read_csv(root + "/train.csv")
+        tr["StudyInstanceUID"] = tr["StudyInstanceUID"].astype(str)
+        labelled = tr[list(LAB)].notna().all(axis=1)
+        if EVAL_SPLIT == "trainall":
+            # EVERY training study, scored by nothing in here.
+            #
+            # E106 needs per-finding blend weights derived from data the 58 gold
+            # are NOT in, so that gold-58 can then TEST the rule instead of
+            # producing it. The arbiter is the public report labels over 4,349
+            # non-gold studies -- 75x the sample of gold-58 and, crucially,
+            # disjoint from it. That scoring happens offline; this kernel's only
+            # job is to put the CoAtNet arms on the same studies the v1 lineage
+            # already has honest out-of-fold predictions for.
+            # Only the study list differs. Series lookup, the missing-series
+            # guard and the split print are all shared below; duplicating them
+            # here would leave two copies of the same logic to drift apart.
+            ids = tr["StudyInstanceUID"].tolist()
+            truth = None
+            print(f"trainall: {len(ids)} studies, of which "
+                  f"{int(labelled.sum())} carry expert labels — those are the "
+                  f"held-out test set for anything fitted on the rest, so "
+                  f"nothing downstream may fit on them", flush=True)
+        gold = tr[labelled].reset_index(drop=True)
+        if EVAL_SPLIT != "trainall" and len(gold) != GOLD_EXPECTED:
+            raise RuntimeError(
+                f"train.csv has {len(gold)} fully-labelled studies, expected "
+                f"{GOLD_EXPECTED}. The expert set this project scores on has "
+                f"changed shape; every historical gold number is about a "
+                f"different instrument until that is understood.")
+        if EVAL_SPLIT != "trainall":
+            ids = gold["StudyInstanceUID"].tolist()
+            truth = gold[list(LAB)].to_numpy(np.float64)
+            # Both classes must be present per finding or AUC is undefined, and
+            # an undefined column silently poisons the macro.
+            degenerate = [f for k, f in enumerate(LAB)
+                          if truth[:, k].min() == truth[:, k].max()]
+            if degenerate:
+                raise RuntimeError(f"single-class findings in gold: {degenerate}")
+        tser = pd.read_csv(root + "/train_series.csv")
+    else:
+        tsdir = root + "/test_series"
+        if not os.path.isdir(tsdir):
+            tsdir = root + "/test_images"
+        test = pd.read_csv(root + "/test.csv")
+        test["StudyInstanceUID"] = test["StudyInstanceUID"].astype(str)
+        ids = test["StudyInstanceUID"].tolist()
+        truth = None
+        tser = pd.read_csv(root + "/test_series.csv")
     tser["StudyInstanceUID"] = tser["StudyInstanceUID"].astype(str)
     tser["SeriesInstanceUID"] = tser["SeriesInstanceUID"].astype(str)
+    tser = tser[tser["StudyInstanceUID"].isin(set(ids))]
     series = {k: v.to_dict("records") for k, v in tser.groupby("StudyInstanceUID")}
-    print(f"test studies {len(ids)} | test series {len(tser)}", flush=True)
+    missing = [s for s in ids if s not in series]
+    if missing:
+        raise RuntimeError(f"{len(missing)} studies have no series rows, first {missing[0]}")
+    print(f"split {EVAL_SPLIT} | studies {len(ids)} | series {len(tser)}", flush=True)
 
     cols = ["StudyInstanceUID"] + list(LAB)
     ssub = os.path.join(root, "sample_submission.csv")
@@ -437,7 +606,7 @@ def main():
             def build_one(item, _img=img, _slots=slots, _span=span):
                 j, sid = item
                 try:
-                    vol, mask = build_study(sid, series, tsdir, reader, _img, _slots, _span)
+                    vol, mask = build_raptor_study(sid, series, tsdir, reader, _img, _slots, _span)
                     if not mask.any():
                         # No slot filled, and no exception raised. Without this the
                         # study contributes a 0.5 row that looks like a prediction;
@@ -544,20 +713,270 @@ def main():
         if str(device).startswith("cuda"):
             torch.cuda.empty_cache()
 
+    # ---- THE SECOND ARCHITECTURE'S PASS ------------------------------------
+    v1_probs, v1_members = None, {}
+@@IF V1_MEMBERS@@
+    if V1_MEMBERS:
+        import torch as _torch
+        ckpts, v1_prints = v1_checkpoints
+        v1_models, v1_names = [], []
+        for cp in ckpts:
+            st = _torch.load(cp, map_location=device, weights_only=False)
+            # Averaging is only meaningful between models fed the same way, and
+            # these two properties are invisible in the weights.
+            for key, want in (("slice_subsample", V1_SLICE_SUBSAMPLE),
+                              ("input_norm", V1_INPUT_NORM)):
+                if key in st and st[key] != want:
+                    raise RuntimeError(
+                        f"{cp.name} was trained with {key}={st[key]!r} but this "
+                        f"kernel declares {want!r}; averaging them is invalid")
+            m = build_model(st.get("backbone", "resnet18"), 3, len(LAB),
+                            V1_INPUT_NORM, bool(st.get("per_finding_pool", False)),
+                            int(st.get("focal_k", 0) or 0)).to(device)
+            w = {k: v for k, v in st["model"].items() if k not in ("mean", "std")}
+            m.load_state_dict(w, strict=False)
+            m.eval()
+            v1_models.append(m)
+            # The mounting directory, which is the trainer slug. In gold mode each
+            # member is dumped under this name, so one run can score several
+            # SEPARATE models rather than only their average -- E104 needs two
+            # label arms compared, and averaging them would answer nothing.
+            v1_names.append(cp.parts[-2] if len(cp.parts) > 1 else cp.name)
+            # FINGERPRINT EACH MEMBER FROM ITS OWN WEIGHTS. The five full-fit
+            # members differ only by seed, so they land in five directories
+            # holding a file of the SAME NAME -- and the first version of this
+            # print showed `parent.parent`, which is the account name for all
+            # five. The log could not distinguish five distinct checkpoints from
+            # one found five times, and one model averaged with itself five times
+            # is a silent 5x downgrade that scores worse and raises nothing.
+            # `MEMBERS_EXPECTED` counts; this checks identity.
+            print(f"  [v1] {'/'.join(cp.parts[-3:])}: {st.get('backbone')}, "
+                  f"epoch {st.get('best_epoch', st.get('epoch'))}, "
+                  f"seed {st.get('seed', '?')}", flush=True)
+
+        vser = tser.copy()
+        if "n_slices" not in vser.columns:
+            vser["n_slices"] = 1
+        by_study = dict(list(vser.groupby("StudyInstanceUID")))
+        split_dir = "train" if EVAL_SPLIT == "gold" else "test"
+        raw = np.full((len(v1_models), len(ids), len(LAB)), np.nan, np.float32)
+        v1_bad = 0
+        v1_t0 = time.time()
+
+        def build_v1(item):
+            j, sid = item
+            try:
+                rows = by_study.get(sid)
+                if rows is None or rows.empty:
+                    return j, None, "no series rows"
+                stack, _rec = build_study(Path(root), split_dir, sid, rows)
+                if V1_SLICE_SUBSAMPLE and stack.shape[1] > V1_SLICE_SUBSAMPLE:
+                    idx = np.linspace(0, stack.shape[1] - 1,
+                                      V1_SLICE_SUBSAMPLE).round().astype(int)
+                    stack = stack[:, idx]
+                return j, stack, None
+            except Exception as exc:                                  # noqa: BLE001
+                return j, None, f"{type(exc).__name__}: {exc}"
+
+        pending = []
+
+        def flush(batch):
+            if not batch:
+                return
+            idxs = [b[0] for b in batch]
+            x = _torch.from_numpy(
+                np.stack([b[1] for b in batch]).astype(np.float32) / 255.0).to(device)
+            with _torch.no_grad():
+                for mi, m in enumerate(v1_models):
+                    out = _torch.sigmoid(m(x)).cpu().numpy()
+                    for slot, j in enumerate(idxs):
+                        raw[mi, j] = out[slot]
+            if str(device).startswith("cuda"):
+                _torch.cuda.synchronize()
+
+        workers = max(2, min(8, (os.cpu_count() or 4)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            for done, (j, stack, err) in enumerate(
+                    pool.map(build_v1, enumerate(ids)), start=1):
+                if err is not None or stack is None:
+                    v1_bad += 1
+                    if v1_bad <= 20:
+                        print(f"  [v1] study {j} FALLBACK ({err})", flush=True)
+                else:
+                    pending.append((j, stack))
+                    if len(pending) >= V1_BATCH_STUDIES:
+                        flush(pending)
+                        pending = []
+                if done % 100 == 0 or done == len(ids):
+                    r = (time.time() - v1_t0) / done
+                    print(f"  [v1] {done}/{len(ids)} | {r:.2f}s/study, projects "
+                          f"{r * 1300 / 3600:.2f} h on 1,300", flush=True)
+            flush(pending)
+        v1_seconds = time.time() - v1_t0
+        scored_seconds += v1_seconds
+        rate = v1_bad / max(1, len(ids))
+        print(f"[v1] {len(v1_models)} members | fallbacks {v1_bad}/{len(ids)} "
+              f"({rate:.1%}) | {v1_seconds:.0f}s", flush=True)
+        if rate > FALLBACK_LIMIT:
+            raise RuntimeError(
+                f"v1 arm: {rate:.1%} of studies fell back, limit {FALLBACK_LIMIT:.1%}")
+        # Rank-average the members, then rank the result, so the arm contributes
+        # ONE ordering per finding regardless of how many checkpoints built it.
+        # Equal weights: these differ only by seed, and E064 priced weighting
+        # same-kind members at +0.001.
+        member_ranks = np.stack([rankpct(np.nan_to_num(raw[mi], nan=0.5))
+                                 for mi in range(len(v1_models))])
+        v1_probs = member_ranks.mean(axis=0)
+        v1_members = {v1_names[mi]: np.nan_to_num(raw[mi], nan=0.5)
+                      for mi in range(len(v1_models))}
+        del v1_models
+        gc.collect()
+        if str(device).startswith("cuda"):
+            torch.cuda.empty_cache()
+@@ENDIF V1_MEMBERS@@
+
     weights = np.array([float(a["w"]) for a in ARMS], dtype=np.float64)
     weights = weights / weights.sum()
     named = dict(zip([a["name"] for a in ARMS], weights.round(4), strict=True))
     print(f"[blend] weighted rank-mean {named}", flush=True)
     ranks = np.tensordot(weights, np.stack([rankpct(np.clip(p, 0, 1)) for p in probs]), axes=(0, 0))
     ranks[~np.isfinite(ranks)] = 0.5
+@@IF V1_MEMBERS@@
+    if v1_probs is not None:
+        # V1_BLEND_W IS THE ONE FITTED NUMBER IN THIS PIPELINE, and E107 says so
+        # rather than dressing it up. Six schemes in this log were refused for
+        # choosing a weight on the 58 gold studies. What changed is not the
+        # evidence -- it is the COST OF BEING WRONG. The board keeps a team's
+        # best submission, 0.938 is banked, and slots are unused, so testing a
+        # weight can no longer lose anything. That was never true before.
+        #
+        # What gold-58 supports is the DIRECTION, not the magnitude: bootstrapped
+        # over 4,000 resamples the optimum has median 0.35 and a 95% interval of
+        # [0.05, 0.55], with P(optimum <= 0.50) = 0.972. The 0.30-vs-0.50
+        # difference itself is +0.0022 with CI [-0.0044, +0.0092] -- not
+        # separated. So 0.50 sits at the top edge of the plausible range and
+        # moving down is supported; moving to any PARTICULAR value is not.
+        #
+        # 0.40 rather than gold's own argmax of 0.30, for two reasons that both
+        # pull the same way. The sweep used the five-fold OUT-OF-FOLD v1 at 0.8980
+        # gold, while the member actually shipped is the FULL-FIT five at 0.926
+        # board against the fold ensemble's 0.923 -- a stronger member wants more
+        # weight, not less. And weighting the two arms by their measured BOARD
+        # scores (0.932 and 0.926), the only instrument here that has never
+        # misled, lands on 0.497. Two signals disagree; 0.40 is between them and
+        # nearer the bootstrap median than the shipped value is.
+        #
+        # Both sides are re-ranked first. The left is a WEIGHTED MEAN of rank
+        # columns and the right a plain mean of them; neither is uniform on
+        # (0,1), and averaging them raw would hand the flatter one the ordering.
+        coat_r, v1_r = rankpct(ranks), rankpct(v1_probs)
+        ranks = (1.0 - V1_BLEND_W) * coat_r + V1_BLEND_W * v1_r
+        agree = float(np.mean([np.corrcoef(coat_r[:, k], v1_r[:, k])[0, 1]
+                               for k in range(len(LAB))])) if len(ids) > 2 else float("nan")
+        # The weight is INTERPOLATED, not spelled out. This line read a literal
+        # "0.5/0.5" and survived E107 changing the constant to 0.40 -- the math
+        # was right and the log said otherwise, which is the same failure the
+        # trainer's gold message had two days ago: a correct number reported
+        # under the wrong description. A reader would have concluded the change
+        # never took effect.
+        print(f"[blend] + v1 arm at {1 - V1_BLEND_W:.2f}/{V1_BLEND_W:.2f} "
+              f"(coat/v1) | mean cross-architecture rank "
+              f"correlation {agree:.3f} (E101 measured 0.793 on gold; CoAtNet's "
+              f"own four arms sit at 0.905-0.986)", flush=True)
+@@ENDIF V1_MEMBERS@@
 
-    sub = pd.DataFrame(ranks.astype(np.float32), columns=list(LAB))
-    sub.insert(0, "StudyInstanceUID", ids)
-    sub = sub[cols]
-    assert list(sub.columns) == cols, "column order drift"
-    assert sub["StudyInstanceUID"].tolist() == ids, "row identity drift"
-    assert np.isfinite(sub[list(LAB)].to_numpy()).all()
-    sub.to_csv("/kaggle/working/submission.csv", index=False)
+    scores = None
+    if EVAL_SPLIT == "trainall":
+        # No scoring and no submission: 4,407 TRAINING studies. The arbiter lives
+        # offline, and a submission built from these would be scored against a
+        # hidden set it does not contain.
+        rows = []
+        for i, a in enumerate(ARMS):
+            d = pd.DataFrame(probs[i].astype(np.float32), columns=list(LAB))
+            d.insert(0, "arm", a["name"])
+            d.insert(0, "StudyInstanceUID", ids)
+            rows.append(d)
+        out = pd.concat(rows, ignore_index=True)
+        assert len(out) == len(ids) * len(ARMS)
+        out.to_parquet("/kaggle/working/trainall_probs.parquet", index=False)
+        print(f"wrote trainall_probs.parquet rows={len(out)} "
+              f"({len(ids)} studies x {len(ARMS)} arms)", flush=True)
+    elif EVAL_SPLIT == "gold":
+        # NO submission.csv IS WRITTEN HERE, AND THAT IS THE POINT. These 58
+        # studies are training data; a submission built from them would be
+        # scored against the hidden set it does not contain. A notebook with no
+        # submission.csv simply cannot be submitted, which is the safe failure.
+        #
+        # What it writes instead is every arm's RAW probabilities, per study, so
+        # that blend weights can be searched offline for nothing. Until now every
+        # blend question in this project cost a board submission — E097 spent one
+        # to learn that four arms beat one by +0.004 — and E098 closed six blends
+        # on an instrument that had never once seen a blend gain.
+        scores = {"split": "gold", "n": len(ids), "arms": {}}
+        rows = []
+        for i, a in enumerate(ARMS):
+            m, per = macro_auc(truth, probs[i])
+            scores["arms"][a["name"]] = {
+                "macro": round(m, 4),
+                "author_gold_auc": a["expect_gold"],
+                "delta_vs_author": round(m - float(a["expect_gold"]), 4),
+                "per_finding": {f: round(per[k], 4) for k, f in enumerate(LAB)}}
+            print(f"[gold] {a['name']:22s} macro {m:.4f}  "
+                  f"author says {a['expect_gold']}  "
+                  f"delta {m - float(a['expect_gold']):+.4f}", flush=True)
+        bm, bper = macro_auc(truth, ranks)
+        best = max(v["macro"] for v in scores["arms"].values())
+        scores["blend"] = {"macro": round(bm, 4),
+                           "best_single_arm": round(best, 4),
+                           "gain_over_best_single": round(bm - best, 4),
+                           "weights": {k: float(v) for k, v in named.items()},
+                           "per_finding": {f: round(bper[k], 4) for k, f in enumerate(LAB)}}
+        print(f"[gold] BLEND macro {bm:.4f} | best single {best:.4f} | "
+              f"gain {bm - best:+.4f}", flush=True)
+@@IF V1_MEMBERS@@
+        for _nm, _pr in v1_members.items():
+            _m, _per = macro_auc(truth, _pr)
+            scores["arms"][f"v1:{_nm}"] = {
+                "macro": round(_m, 4), "author_gold_auc": None,
+                "delta_vs_author": None,
+                "per_finding": {f: round(_per[k], 4) for k, f in enumerate(LAB)}}
+            print(f"[gold] v1 member {_nm:28s} macro {_m:.4f}", flush=True)
+            rows.append(pd.DataFrame(
+                {"StudyInstanceUID": ids, "arm": f"v1:{_nm}",
+                 **{f: _pr[:, k].astype(np.float32) for k, f in enumerate(LAB)}}))
+        if v1_probs is not None:
+            vm, vper = macro_auc(truth, v1_probs)
+            scores["arms"]["v1"] = {
+                "macro": round(vm, 4), "author_gold_auc": None,
+                "delta_vs_author": None,
+                "per_finding": {f: round(vper[k], 4) for k, f in enumerate(LAB)}}
+            print(f"[gold] {'v1 (' + str(V1_MEMBERS) + ' members)':22s} macro {vm:.4f}",
+                  flush=True)
+            print("[gold] NOTE: a FULL-FIT v1 member trained on all 58 gold "
+                  "studies, so this number is contaminated upward and is a "
+                  "plumbing check, not a score.", flush=True)
+@@ENDIF V1_MEMBERS@@
+        for i, a in enumerate(ARMS):
+            d = pd.DataFrame(probs[i].astype(np.float32), columns=list(LAB))
+            d.insert(0, "arm", a["name"])
+            d.insert(0, "StudyInstanceUID", ids)
+            rows.append(d)
+        out = pd.concat(rows, ignore_index=True)
+        assert len(out) == len(ids) * (len(ARMS) + len(v1_members))
+        out.to_csv("/kaggle/working/gold_probs.csv", index=False)
+        truth_df = pd.DataFrame(truth.astype(np.int8), columns=list(LAB))
+        truth_df.insert(0, "StudyInstanceUID", ids)
+        truth_df.to_csv("/kaggle/working/gold_truth.csv", index=False)
+        Path("/kaggle/working/gold_scores.json").write_text(json.dumps(scores, indent=2))
+        print(f"wrote gold_probs.csv rows={len(out)} and gold_scores.json", flush=True)
+    else:
+        sub = pd.DataFrame(ranks.astype(np.float32), columns=list(LAB))
+        sub.insert(0, "StudyInstanceUID", ids)
+        sub = sub[cols]
+        assert list(sub.columns) == cols, "column order drift"
+        assert sub["StudyInstanceUID"].tolist() == ids, "row identity drift"
+        assert np.isfinite(sub[list(LAB)].to_numpy()).all()
+        sub.to_csv("/kaggle/working/submission.csv", index=False)
 
     # Same shape as `infer`'s manifest so the two lineages can be compared
     # without reading logs. `prediction_spread` is the degenerate-model check:
@@ -590,9 +1009,18 @@ def main():
         "total_fallbacks": sum(r["fallbacks"] for r in ran if r),
         "fallback_limit": FALLBACK_LIMIT,
         "arms": ran,
+        "eval_split": EVAL_SPLIT,
+        "gold_scores": scores,
         "prediction_spread": spread}, indent=2))
     print(f"prediction spread: {spread}", flush=True)
-    print(f"wrote /kaggle/working/submission.csv  rows={len(sub)}", flush=True)
+    if EVAL_SPLIT == "test":
+        # Guarded on the SUBMITTING split by name, not on "not gold". This line
+        # read `!= "gold"` and `trainall` -- a third split added later -- fell
+        # through it and raised UnboundLocalError on `sub`, marking a finished
+        # 6.6 h run as ERROR after its parquet was already on disk. An
+        # allow-list of the one split that builds a submission cannot acquire
+        # that bug again when a fourth split is added.
+        print(f"wrote /kaggle/working/submission.csv  rows={len(sub)}", flush=True)
     print(f"DONE {elapsed:.0f}s", flush=True)
 
 

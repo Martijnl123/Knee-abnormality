@@ -53,6 +53,35 @@ ARTIFACTS_DATASET = f"{ACCOUNT}/knee-phase1-artifacts"
 FUSED_DATASET = f"{ACCOUNT}/knee-phase1-fused"
 PUBLIC_DATASET = f"{ACCOUNT}/knee-phase1-public"
 DISTILLED_DATASET = f"{ACCOUNT}/knee-phase1-distilled"
+# THE TWO ARMS OF E104, AND WHY THERE ARE TWO.
+#
+# `dreaddevelopment/rsna-knee-labels` (CC0) carries soft labels for 4,349
+# studies -- every study except EXACTLY the 58 gold, verified as a set identity
+# in E088. E089 scored the public label sets against gold and recorded this one
+# as "unscoreable": zero overlap, so the labels cannot be compared to the expert
+# values at all. That is true of the LABELS and it is where the log stopped.
+#
+# It is not true of a MODEL TRAINED ON THEM. A label set that excludes the gold
+# by construction means a model trained on all of it has never seen a gold
+# study, so gold-58 is a clean holdout for a model fitted on 98.7% of the
+# corpus. This project has never had that: the 5-fold lineage is honest but each
+# member misses a fifth of the data, and the full-fit lineage sees everything and
+# cannot be scored at all (E083, and `knee-infer-v1pubfull5`'s own note).
+#
+# DREAD is that arm. PUB4349 is its control: the incumbent `stevenleehans`
+# labels restricted to the SAME 4,349 studies, so the studies, the architecture,
+# the geometry, the epochs and the seed are all identical and the label source
+# is the only difference. Both parquets are structurally identical -- the
+# incumbent's channel and weight columns are constants (`asserted` / 1.0 across
+# all 52,884 cells), so they were copied and only the values differ.
+#
+# The two sets share NO cell value (0.0% identical) and their per-finding
+# Spearman runs 0.52 to 0.945, lowest on **Synovitis (0.520)** and Fracture
+# (0.609). Synovitis is this project's floor since E059 and the weakest finding
+# in the CoAtNet blend (0.809), so the label sets disagree most exactly where
+# there is the most to win.
+DREAD_DATASET = f"{ACCOUNT}/knee-phase1-dread"
+PUB4349_DATASET = f"{ACCOUNT}/knee-phase1-pub4349"
 """Publicly shared LLM report labels, repackaged into this pipeline's schema.
 
 NOT this project's labels. Source: `stevenleehans/rsna-knee-llm-report-labels`,
@@ -392,6 +421,105 @@ RAPTOR_ARMS = (
     {"name": "native384-v8", "file": "raptor_ft_coatnet_v8_full_swa.pt",
      "img": 384, "slots": RAPTOR_SLOTS44, "span": (0.06, 0.94),
      "k_eval": 42, "reverse": False, "w": 0.20, "expect_gold": 0.9067},
+)
+
+# TEST-TIME AUGMENTATION FROM THE CHECKPOINTS ALREADY MOUNTED (E103).
+#
+# Two axes, and the point of both is that they introduce NO new asset, NO new
+# training and NO hyperparameter chosen on the 58 gold studies.
+#
+# AXIS 1 -- REVERSE THE OTHER TWO CHECKPOINTS. Upstream publishes four arms and
+# exactly one of them is a transform rather than a file: `maxspan-v5-reverse`,
+# the same weights with the three-slice triplet reversed. They never applied it
+# to `native384-v8` or `native384dense-v10`. Applying it there adds two members
+# for two extra forward passes on a volume that is already built -- the template
+# groups by preprocessing signature, so a reverse member costs one forward and
+# not a second pass. Zero new hyperparameters: the mechanism is upstream's own
+# and it is already in the blend that scored 0.932.
+#
+# AXIS 2 -- JITTER THE SPAN. `span` selects which slices of each source series
+# fill the stack: `lo, hi = int(n * span_lo), int(n * span_hi) - 1`, then k of
+# them evenly. Changing it resamples the volume from different source slices,
+# which is ordinary multi-crop TTA along the slice axis.
+#
+#   THE JITTER MAGNITUDE IS TAKEN FROM UPSTREAM, NOT FROM GOLD. v5 and v10 span
+#   (0.02, 0.98); v8 spans (0.06, 0.94). The authors' own arms differ by exactly
+#   0.04 at each end, so 0.04 and 0.08 are their step and twice their step. No
+#   number here was chosen by looking at a score.
+#
+# WHAT IS DELIBERATELY ABSENT: a horizontal flip. Upstream's prose calls their
+# reverse member one and the template's comment already records that the code
+# does something else. A true left-right mirror is not merely a distribution
+# shift here, it is WRONG FOR THIS LABEL SET: four of the twelve findings are
+# Medial/Lateral Meniscus and Medial/Lateral OA, and medial versus lateral is
+# which SIDE of the knee a structure sits on. Mirroring a left knee turns it
+# into a right knee and swaps medial with lateral, so those four findings would
+# be read off the wrong compartment. That is presumably why upstream's transform
+# is a slice reversal and not a mirror.
+#
+# ALSO ABSENT: varying `k_eval`. `_eval_centers` takes `k` points evenly over
+# the interior of the filled mask, and v5 already asks for 62 of at most 62. It
+# is not subsampling, so a smaller k removes information and a larger one
+# duplicates slices. There is no resampling diversity on that axis to have.
+
+
+def _span(lo, hi, step):
+    return (round(lo + step, 2), round(hi - step, 2))
+
+
+def _variant(arm, name, span=None, reverse=None):
+    return {**arm, "name": name,
+            "span": arm["span"] if span is None else span,
+            "reverse": arm["reverse"] if reverse is None else reverse,
+            # Flat weights: this manifest exists to DUMP per-arm probabilities,
+            # and the blend weights are searched offline afterwards. The kernel's
+            # own blend line is a flat average and is not the thing under test.
+            "w": 1.0}
+
+
+_V10 = RAPTOR_ARMS[1]
+_V8 = RAPTOR_ARMS[3]
+RAPTOR_TTA_ARMS = (
+    # the four published arms, unchanged, so the sweep has its own control
+    _variant(RAPTOR_V5, "maxspan-v5"),
+    _variant(_V10, "native384dense-v10"),
+    _variant(RAPTOR_V5, "maxspan-v5-reverse", reverse=True),
+    _variant(_V8, "native384-v8"),
+    # axis 1: upstream's own transform, applied to the two files they left out
+    _variant(_V10, "native384dense-v10-reverse", reverse=True),
+    _variant(_V8, "native384-v8-reverse", reverse=True),
+    # axis 2: one step and two steps inward, at upstream's own step size
+    _variant(RAPTOR_V5, "maxspan-v5-span04", span=_span(0.02, 0.98, 0.04)),
+    _variant(RAPTOR_V5, "maxspan-v5-span08", span=_span(0.02, 0.98, 0.08)),
+    _variant(_V10, "native384dense-v10-span04", span=_span(0.02, 0.98, 0.04)),
+    _variant(_V10, "native384dense-v10-span08", span=_span(0.02, 0.98, 0.08)),
+    _variant(_V8, "native384-v8-span04", span=_span(0.06, 0.94, 0.04)),
+    _variant(_V8, "native384-v8-span08", span=_span(0.06, 0.94, 0.08)),
+)
+
+# E108. ONE STEP NARROWER, ON EVERY CHECKPOINT, TESTED AT 75x GOLD'S SAMPLE.
+#
+# E103 found all SIX span-narrowed variants beat their parent on the 58 gold --
+# six for six, one direction -- and `maxspan-v5-span04` at 0.9253 is the highest
+# single arm this project has measured, above the published four-arm blend. It
+# closed anyway, because gold-58 both produced that hypothesis and would have
+# been the only thing testing it.
+#
+# E108's finding reopens it: the report-label proxy ranks the four published
+# CoAtNet arms at Spearman +0.800 against gold, where E106 measured +0.052 for
+# the cross-architecture case. E106's bias is that the proxy rewards a model for
+# agreeing with the labels it was trained on -- and that is common-mode between
+# two inference geometries of the SAME checkpoint. It cancels. So the 4,349
+# non-gold studies can judge this, and gold-58 does not have to judge its own
+# hypothesis.
+#
+# ONE STEP FOR ALL THREE, not the per-checkpoint best. Gold's own per-arm optima
+# disagree (span04 for v5 and v10, span08 for v8); picking each checkpoint's best
+# would be three parameters fitted on 58 studies. 0.04 is upstream's own spacing
+# and is applied uniformly.
+RAPTOR_SPAN04_ARMS = tuple(
+    _variant(a, f"{a['name']}-span04", span=_span(a["span"][0], a["span"][1], 0.04))
+    for a in (RAPTOR_V5, RAPTOR_ARMS[1], RAPTOR_ARMS[3])
 )
 
 V1 = Geometry(
@@ -1453,6 +1581,11 @@ EXTRAS = [
             # decoded volume is ~7 MB, so 32 is ~230 MB of slack; an unbounded
             # map over 1,300 studies would hold them all.
             "DECODE_AHEAD": 32,
+            # The hidden set. Writes submission.csv and scores nothing offline.
+            "EVAL_SPLIT": "test",
+            "GOLD_EXPECTED": 58,
+            # The second architecture is off: CoAtNet arms only.
+            "V1_MEMBERS": None,
         },
         note="THE CONTROL, and it must be submitted before any blend.\n"
              "\n"
@@ -1511,6 +1644,11 @@ EXTRAS = [
             # decoded volume is ~7 MB, so 32 is ~230 MB of slack; an unbounded
             # map over 1,300 studies would hold them all.
             "DECODE_AHEAD": 32,
+            # The hidden set. Writes submission.csv and scores nothing offline.
+            "EVAL_SPLIT": "test",
+            "GOLD_EXPECTED": 58,
+            # The second architecture is off: CoAtNet arms only.
+            "V1_MEMBERS": None,
         },
         note="The CoAtNet arm of the public 0.937 system, at its published\n"
              "weights: maxspan-v5 0.55, native384-v8 0.20, maxspan-v5 flipped\n"
@@ -1533,6 +1671,692 @@ EXTRAS = [
              "\n"
              "ATTRIBUTION: as `knee-infer-raptorcc0`, plus the blend weights\n"
              "from the public write-up `4-arm-ensemble-explained-rsna-knee-0-937`.",
+    ),
+    # THE INSTRUMENT THIS PROJECT HAS NEVER HAD.
+    #
+    # Every CoAtNet number in the log is an author's self-report. E090 verified
+    # the checkpoints carry `gold_auc` 0.9214 / 0.9174 / 0.9067 and recorded, in
+    # the same entry, that *"there is no offline gold evaluation available for
+    # this arm"*. E097 then spent a board submission to learn the four-arm blend
+    # beats one arm by +0.004, and E098 closed six foreign blends on gold-58
+    # while noting that gold-58 has never once seen a blend gain — a caution it
+    # had no way to test.
+    #
+    # This kernel tests it. Same template, same preprocessing, same forward
+    # pass, pointed at the 58 expert-labelled TRAINING studies instead of the
+    # hidden set. It writes no submission and costs no submission: the gold
+    # labels are in the competition's own `train.csv` (exactly 58 of 4,407 rows
+    # have all twelve findings filled), so no extra dataset is mounted and the
+    # only inputs are the three CC0 `dreaddevelopment` weight sets.
+    #
+    # THE ARMS HELD GOLD OUT OF TRAINING. Upstream's write-up states it and the
+    # per-file `gold_auc` values only mean anything under it. If that is wrong
+    # the measurement here is contaminated upward, and the tell is a macro far
+    # ABOVE 0.9214 rather than near it.
+    #
+    # WHAT IT DECIDES, pre-registered in E099 before it runs:
+    #   1. measured v5 within +/-0.01 of 0.9214 -> the self-reports transfer and
+    #      E048's gap table stands as written.
+    #   2. measured v5 below 0.90 -> they do not transfer, and every `expect_gold`
+    #      in this file is a mount fingerprint only, never a score.
+    #   3. blend beats best single arm on gold-58 -> gold-58 can see a blend gain
+    #      and E098's caution retires. It does not -> gold-58 is blind to a gain
+    #      the board measured at +0.004, and the four "not separated" blend
+    #      readings (E033, E039, E046, E048) are void.
+    # No outcome here is uninformative, which is the whole reason to run it.
+    Kernel(
+        slug="knee-gold-raptorcc0x4",
+        directory="83_gold_raptorcc0x4",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            # The 58 expert studies. Writes gold_probs.csv, gold_truth.csv and
+            # gold_scores.json; writes NO submission.csv, so it cannot be
+            # submitted by accident against a set it does not contain.
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. Scores the four CC0 CoAtNet arms on this\n"
+             "project's own 58 expert studies and dumps their raw per-study\n"
+             "probabilities, so blend weights can be searched offline instead\n"
+             "of on the board at 2.4 GPU-h and one submission per question.\n"
+             "\n"
+             "It writes no submission.csv on purpose: these 58 studies are\n"
+             "TRAINING data. A notebook with no submission.csv cannot be\n"
+             "submitted, which is the safe failure.\n"
+             "\n"
+             "COST: 58 studies against 82's 1,300, same four arms, so about\n"
+             "a tenth of 82's scored time plus the same fixed setup. Run it,\n"
+             "do not submit it, and download gold_probs.csv.\n"
+             "\n"
+             "WHAT TO READ FIRST in the log: the `[gold]` lines. If\n"
+             "maxspan-v5 does not land near 0.9214 the self-reports do not\n"
+             "transfer and E097's +0.004 was bought on a premise this\n"
+             "project never checked.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    Kernel(
+        slug="knee-train-lab-dread",
+        directory="88_train_lab_dread",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[DREAD_DATASET],
+        # RUN_FOLD=-1 is a full fit, and here it costs nothing in honesty: the
+        # label set has no gold rows, so `build_cohort` finds no gold study to
+        # put in `studies` at all and the 58 stay outside training whatever this
+        # is set to. The log will read "gold studies in cache: 0", which is the
+        # tell that the holdout is real.
+        constants={"RUN_FOLD": -1,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, seed=3).constants()},
+        note="ARM A of the first label comparison this project has measured on a\nMODEL rather than on the labels themselves.\n\nTrains the 0.923 configuration on `dreaddevelopment`'s CC0 soft\nlabels over 4,349 studies - every study except exactly the 58\ngold. So this is a FULL FIT that is still honestly scoreable: the\n58 are outside the training set by construction, not by a split.\n\nE089 called this label set unscoreable and it is, as LABELS. The\nmodel trained on them is not, and that is the whole point.\n\nIts authors' own headline for these labels is +0.013 AUC (E088),\nself-reported. This measures it.\n\nONE VARIABLE. `knee-train-lab-pub4349` is the control: same 4,349\nstudies, same resnet34, same 192px/0.6mm geometry, same 24 epochs,\nsame batch, same LR, same seed 3. Only the label source differs.\n\nATTRIBUTION: labels from `dreaddevelopment/rsna-knee-labels`,\nCC0-1.0, repackaged into this pipeline's schema with credit.",
+    ),
+    Kernel(
+        slug="knee-train-lab-pub4349",
+        directory="89_train_lab_pub4349",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUB4349_DATASET],
+        # RUN_FOLD=-1 is a full fit, and here it costs nothing in honesty: the
+        # label set has no gold rows, so `build_cohort` finds no gold study to
+        # put in `studies` at all and the 58 stay outside training whatever this
+        # is set to. The log will read "gold studies in cache: 0", which is the
+        # tell that the holdout is real.
+        constants={"RUN_FOLD": -1,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, seed=3).constants()},
+        note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
+    ),
+    # E109. THE OLDEST CLAIM IN THE LOG, RETESTED UNDER THE LABELS IT PREDATES.
+    #
+    # `PATH.md` §1 records "architecture, every attempt: 0.000" and that line
+    # governs how every hour of GPU here gets allocated. Every experiment behind
+    # it — E012-E024, 288px, DINOv2 twice, focal top-k, per-finding pooling —
+    # ran on or before **2026-08-19**, and E041/E044 replaced the labels
+    # afterwards for **+0.1067 on the 58 gold**. So the claim was measured under
+    # labels that E044 proved were costing 0.107 of macro AUC, which is three
+    # times E060's own +/-0.03 noise floor. **An architecture effect could not
+    # have been seen through that.**
+    #
+    # AND E020 DISOWNS ITSELF. Its own entry: *"0.6878 is not a measurement of
+    # this backbone; it is where the clock stopped"* — the DINOv2 curve was
+    # still gaining 0.002 an epoch when the budget ended it at 16. Half the
+    # evidence for the project's largest standing closure is an experiment the
+    # log says was not a comparison.
+    #
+    # ONE FOLD, ONE VARIABLE. Byte-identical to `v1public` fold 0 — same cache,
+    # same 192px/0.6mm geometry, same public labels, same 24 epochs, batch and
+    # LR — with `backbone` the only difference. convnext_tiny rather than
+    # something larger, so this tests the architecture FAMILY and not capacity:
+    # 28M parameters against resnet34's 21M.
+    #
+    # THE INSTRUMENT IS THE POINT, and it is why this is worth running when a
+    # 58-study comparison would not be. Fold 0 holds out **882 studies**, every
+    # one of them report-labelled, and `knee-infer-v1pub`'s existing dump has
+    # resnet34's honest out-of-fold predictions for exactly those. The
+    # comparison is 882 paired studies, not the n~12 gold subset a single fold
+    # carries.
+    #
+    # THE ARBITER'S STATUS, STATED BEFORE THE RUN. E106 invalidated report
+    # labels for ranking OUR model against a FOREIGN one; E108 validated them
+    # within a checkpoint family at Spearman +0.800. Two of our own models,
+    # same labels, same data, same fold, differing only in backbone, is an
+    # UNTESTED MIDDLE CASE — the "rewarded for agreeing with what it was trained
+    # on" bias is common-mode here, which argues it cancels, but that argument
+    # has not been measured for this class. Read the result accordingly.
+    Kernel(
+        slug="knee-train-v1pub-cnx",
+        directory="93_train_v1pub_cnx_fold0",
+        template="train",
+        gpu=True,
+        internet=True,          # timm downloads the pretrained backbone
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUBLIC_DATASET],
+        constants={"RUN_FOLD": 0,
+                   **V1.constants(),
+                   # batch 4 x 4 accumulation = the SAME effective batch of 16
+                   # the control uses. convnext_tiny OOMed the T4 at batch 16
+                   # (each study is 3 planes x 20 slices = 60 images, so a batch
+                   # of 16 is 960 forward passes of activations). Accumulation is
+                   # EXACTLY equivalent here rather than approximately: convnext
+                   # normalises with LayerNorm, which is per-sample, so unlike a
+                   # BatchNorm backbone the split carries no batch-statistics
+                   # difference. The comparison stays one-variable.
+                   **TrainConfig(backbone="convnext_tiny", epochs=24, batch=4,
+                                 accum=4, lr=6e-4, input_norm=True,
+                                 seed=3).constants()},
+        note="Retests the oldest standing claim in this project: that\n"
+             "architecture has measured zero, every time.\n"
+             "\n"
+             "Every experiment behind that claim ran on or before 2026-08-19,\n"
+             "and the labels changed afterwards for +0.1067 on gold (E044).\n"
+             "The claim was measured under labels costing 0.107 of macro AUC,\n"
+             "which is 3x E060's own noise floor - an architecture effect\n"
+             "could not have been seen through that. And E020's own entry\n"
+             "says its DINOv2 number was not a measurement of the backbone\n"
+             "but of where the epoch budget stopped.\n"
+             "\n"
+             "ONE VARIABLE: byte-identical to `knee-train-v1pub` fold 0 except\n"
+             "the backbone. input_norm=True because convnext expects ImageNet\n"
+             "normalisation and resnet34 here was trained without it - that is\n"
+             "a second difference and it is forced, not chosen; it is recorded\n"
+             "in E109 rather than hidden.\n"
+             "\n"
+             "Read it on the 882 held-out studies of fold 0, NOT on the ~12\n"
+             "gold ones a single fold carries. `knee-oof-v1pub-cnx` builds\n"
+             "that dump on CPU for zero GPU quota.\n"
+             "\n"
+             "~2-3 h. If it separates, five folds is the follow-up; if it does\n"
+             "not, PATH.md's line stands and is no longer stale.",
+    ),
+    # THE CONTROL ARM, and it exists because without it this repeats E020's own
+    # unresolved flaw. convnext needs ImageNet normalisation; the resnet34
+    # baseline was trained without it. Comparing them directly confounds the
+    # backbone with the input scaling — which is precisely what E020 flagged in
+    # 2026-08-19 (*"ImageNet normalisation on, which the resnet34 runs did not
+    # have"*) and then never separated. Repeating that would leave the stale
+    # claim replaced by an equally unreadable one.
+    #
+    # So resnet34 is re-run at fold 0 WITH normalisation. Three arms then bound
+    # both variables: the existing `knee-train-v1pub` (resnet34, no norm), this
+    # (resnet34, norm), and the convnext (norm). Backbone is read from the last
+    # two; normalisation from the first two. Cost is one extra fold, ~1.4 h.
+    Kernel(
+        slug="knee-train-v1pub-norm",
+        directory="95_train_v1pub_norm_fold0",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUBLIC_DATASET],
+        constants={"RUN_FOLD": 0,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, input_norm=True, seed=3).constants()},
+        note="THE CONTROL FOR `knee-train-v1pub-cnx`, and it must run.\n"
+             "\n"
+             "convnext needs ImageNet normalisation and the resnet34 baseline\n"
+             "was trained without it, so comparing them directly confounds\n"
+             "the backbone with the input scaling. E020 hit exactly this in\n"
+             "August - `ImageNet normalisation on, which the resnet34 runs did\n"
+             "not have` - and never separated it, which is half of why the\n"
+             "architecture claim is unreadable today.\n"
+             "\n"
+             "Three arms bound both variables: `knee-train-v1pub` (resnet34,\n"
+             "no norm), this one (resnet34, norm), and the convnext (norm).\n"
+             "Backbone is read from the last two; normalisation from the\n"
+             "first two.\n"
+             "\n"
+             "~1.4 h. Skipping it would replace a stale claim with an\n"
+             "equally unreadable one.",
+    ),
+    Kernel(
+        slug="knee-oof-v1pub-norm",
+        directory="96_oof_v1pub_norm",
+        template="gold_eval",
+        gpu=False,
+        internet=False,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3", "knee-train-v1pub-norm"],
+        datasets=[PUBLIC_DATASET],
+        constants={**V1.constants(), "TTA_VIEWS": ("identity",),
+                   "OOF_SCOPE": "all"},
+        note="Out-of-fold predictions from the resnet34+normalisation fold-0\n"
+             "control, for the 882 studies it held out. CPU, zero GPU quota.",
+    ),
+    Kernel(
+        slug="knee-oof-v1pub-cnx",
+        directory="94_oof_v1pub_cnx",
+        template="gold_eval",
+        gpu=False,          # 882 forward passes on CPU; zero GPU quota
+        internet=False,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3", "knee-train-v1pub-cnx"],
+        datasets=[PUBLIC_DATASET],
+        constants={**V1.constants(), "TTA_VIEWS": ("identity",),
+                   "OOF_SCOPE": "all"},
+        note="Out-of-fold predictions from the convnext fold-0 model, for the\n"
+             "882 studies it held out. The comparison arm is\n"
+             "`knee-oof-v1pub`'s existing dump, which carries resnet34's\n"
+             "honest predictions for the same 882.\n"
+             "\n"
+             "CPU, so it costs no GPU quota - the same reason\n"
+             "`knee-oof-v1pub` runs this way.",
+    ),
+    # E108's READOUT: the three narrowed arms on all 4,407, to sit beside E106's
+    # dump of the three published ones and be compared on the 4,349 that are not
+    # the 58.
+    Kernel(
+        slug="knee-trainall-span04",
+        directory="92_trainall_span04",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 3,
+            "ARMS": RAPTOR_SPAN04_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "trainall",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. The three CoAtNet checkpoints run one span\n"
+             "step narrower - 0.04 at each end, upstream's own spacing - over\n"
+             "all 4,407 studies.\n"
+             "\n"
+             "WHY IT IS BACK. E103 found six of six narrowed variants beat\n"
+             "their parent on the 58 gold and closed the route anyway,\n"
+             "because gold-58 had produced that hypothesis and would have\n"
+             "been the only thing testing it. E108 measured the report-label\n"
+             "proxy ranking the four published arms at Spearman +0.800\n"
+             "against gold, where E106 got +0.052 across architectures: the\n"
+             "proxy's bias is agreement with what a model was TRAINED on, and\n"
+             "that is common-mode between two geometries of one checkpoint.\n"
+             "\n"
+             "So the 4,349 non-gold studies decide, and gold-58 no longer has\n"
+             "to judge its own hypothesis.\n"
+             "\n"
+             "ONE STEP FOR ALL THREE. Gold's per-arm optima disagree (span04\n"
+             "for v5 and v10, span08 for v8) and picking each checkpoint's\n"
+             "best would be three parameters fitted on 58 studies.\n"
+             "\n"
+             "~6.6 h at E106's measured 1.01 s/study over three build groups.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    # E106. THE CoAtNet ARMS ON ALL 4,407 STUDIES, so a blend rule can be FITTED
+    # somewhere other than the 58 studies it will be tested on.
+    #
+    # E105's oracle bound said the available headroom in the two shipped arms is
+    # +0.0076 gold, and that it is concentrated in three findings where the
+    # uniform 0.5 weight DESTROYS AUC: MCL 0.982 -> 0.950, Medial Meniscus
+    # 0.968 -> 0.948, ACL 0.977 -> 0.973. CoAtNet is far ahead there and
+    # averaging a weaker member in costs real ordering.
+    #
+    # Fitting twelve per-finding weights on 58 studies is what this log has
+    # declined six times and it stays declined. What makes this different is that
+    # the weights are derived on 4,349 studies the 58 are NOT in, so gold-58
+    # becomes a HELD-OUT TEST of the rule rather than its source. This project
+    # has never had a train/validate split for a blend weight.
+    #
+    # The arbiter offline is the public report labels (`stevenleehans`, CC0),
+    # which E041 measured at 0.8927 macro against the 58 expert studies. E093
+    # called that proxy's validity unverified and it still is -- but it carries
+    # 75x the sample and, unlike gold-58, using it leaves an honest test set.
+    #
+    # The v1 side already exists: `knee-infer-v1pub`'s five folds dumped honest
+    # out-of-fold predictions covering all 4,407 (verified: 882+882+881+881+881).
+    # Only the CoAtNet side is missing, and this is it.
+    #
+    # COST: E099 measured 4.65 s/study for these four arms, so 4,407 studies is
+    # ~5.7 h against the 9 h cap. No submission. The dump is reusable: every
+    # future blend question about this arm becomes arithmetic instead of a run.
+    Kernel(
+        slug="knee-trainall-raptor",
+        directory="91_trainall_raptor",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "trainall",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION, and it writes none. Runs the four CC0 CoAtNet\n"
+             "arms over all 4,407 TRAINING studies and dumps raw per-study\n"
+             "probabilities to trainall_probs.parquet.\n"
+             "\n"
+             "WHY: E105 bounded the headroom left in the two shipped arms at\n"
+             "+0.0076 gold and found it concentrated where the uniform 0.5\n"
+             "weight destroys AUC - MCL 0.982 -> 0.950, Medial Meniscus\n"
+             "0.968 -> 0.948. A per-finding weight would recover it, and\n"
+             "fitting twelve weights on 58 studies is refused here.\n"
+             "\n"
+             "So the weights get fitted on the 4,349 NON-GOLD studies against\n"
+             "the public report labels, and the 58 gold become a held-out\n"
+             "test of the rule. That split is the entire point: this project\n"
+             "has never validated a blend weight on data that did not\n"
+             "produce it.\n"
+             "\n"
+             "~5.7 h at E099's measured 4.65 s/study, against a 9 h cap.\n"
+             "Watch the projection line at study 100; it should read ~1.7 h\n"
+             "per 1,300.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    # E104's READOUT. Both label arms scored on the 58, in ONE run, separately.
+    #
+    # The gold dump emits one block per v1 member rather than their average,
+    # which is the whole reason this is one kernel and not two: averaging the two
+    # arms would answer nothing, and running them separately would pay for the
+    # CoAtNet pass twice.
+    #
+    # The four CoAtNet arms ride along as the control. They have read
+    # 0.9198 / 0.9170 / 0.9167 / 0.9116 on four consecutive runs; a fifth
+    # confirms this run is measuring the same instrument, and their column is
+    # what the winning label arm gets blended against afterwards.
+    Kernel(
+        slug="knee-gold-labarms",
+        directory="90_gold_labarms",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        depends=["knee-train-lab-dread", "knee-train-lab-pub4349"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": 2,
+            "V1_BLEND_W": 0.40,
+            "V1_BATCH_STUDIES": V1.infer_batch,
+            "V1_SLICE_SUBSAMPLE": None,
+            "V1_INPUT_NORM": False,
+            "CHECKPOINT_GLOB": "checkpoint_fold*.pt",
+            "SKIP_DIRECTORIES": Raw('{"train_series", "test_series"}'),
+            **V1.constants(),
+            "PLANES": ("Sagittal", "Coronal", "Axial"),
+        },
+        note="NOT A SUBMISSION. Scores E104's two label arms on the 58 gold\n"
+             "studies, separately, with the four CoAtNet arms as the control.\n"
+             "\n"
+             "THIS IS AN HONEST NUMBER FOR A FULL-FIT MODEL, which this\n"
+             "project has never had. Both arms trained on 4,349 studies and\n"
+             "both logs print `gold studies in cache: 0` - the label sets\n"
+             "contain no gold rows, so the 58 were never in training.\n"
+             "\n"
+             "Read the two `[gold] v1 member` lines. The pre-registered rule\n"
+             "is E104's: a gap under 0.015 is NOT SEPARATED, because E031\n"
+             "puts gold-58's absolute interval at +/-0.0153. A point estimate\n"
+             "is not a tie-break.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`; labels from\n"
+             "`dreaddevelopment/rsna-knee-labels` and\n"
+             "`stevenleehans/rsna-knee-llm-report-labels`, both CC0-1.0.",
+    ),
+    # TWELVE ARMS FROM THREE FILES, TO PRICE TTA THE WAY E101 PRICED PARTNERS.
+    #
+    # E099's instrument turned "what blend?" from a board submission into
+    # arithmetic, and E101 spent it on eight candidate PARTNERS. This spends it
+    # on the arms themselves: the three mounted checkpoints can produce more
+    # members than upstream published, and nobody has checked whether the extra
+    # ones are diverse enough to pay.
+    #
+    # The four published arms are included unchanged, so the sweep carries its
+    # own control and must reproduce 0.9198 / 0.9170 / 0.9167 / 0.9116 for a
+    # fourth consecutive run before anything else in it is readable.
+    #
+    # NOTHING IS SELECTED ON GOLD. The acceptance rule is fixed in E103 before
+    # the run: each axis is taken WHOLE or not at all, at flat weight within its
+    # checkpoint family. Picking the variants that happened to score well on 58
+    # studies is fitting 12 free parameters to 58 studies, which this project has
+    # declined five times.
+    Kernel(
+        slug="knee-gold-raptortta",
+        directory="87_gold_raptortta",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        constants={
+            "MEMBERS_EXPECTED": 12,
+            "ARMS": RAPTOR_TTA_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. Twelve arms from the same three CC0\n"
+             "checkpoints, scored on the 58 expert studies, dumping raw\n"
+             "per-study probabilities so TTA can be priced offline.\n"
+             "\n"
+             "AXIS 1: upstream publishes ONE transform arm - maxspan-v5 with\n"
+             "its slice triplet reversed - and never applies it to the other\n"
+             "two files. This does. Two extra members for two extra forward\n"
+             "passes on volumes already built.\n"
+             "\n"
+             "AXIS 2: span jitter. `span` picks which source slices fill the\n"
+             "stack, so shifting it resamples the volume. The step is 0.04,\n"
+             "which is the gap between upstream's OWN spans (v5 and v10 at\n"
+             "0.02-0.98, v8 at 0.06-0.94) - taken from their choices, not\n"
+             "from a score.\n"
+             "\n"
+             "NO HORIZONTAL FLIP, on purpose. Four of the twelve findings\n"
+             "are Medial/Lateral Meniscus and Medial/Lateral OA, and medial\n"
+             "versus lateral is which SIDE of the knee a structure sits on.\n"
+             "Mirroring a left knee makes it a right knee and swaps the two,\n"
+             "so those four would be read off the wrong compartment.\n"
+             "\n"
+             "Weights are flat because the blend is searched offline; the\n"
+             "kernel's own blend line is a flat average, not the result.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    # THE FIRST UNION THIS PROJECT EVER PRICED OFFLINE BEFORE SUBMITTING IT.
+    #
+    # E099 built the gold instrument; E101 swept eight candidate partners for the
+    # CoAtNet arms on the 58 expert studies and exactly one has an interior
+    # optimum rather than a monotonic decline away from w=0 -- this project's own
+    # resnet34 2.5D at 192 px.
+    #
+    #   w      0.00    0.10    0.20    0.30    0.50
+    #   macro  0.9225  0.9243  0.9267  0.9277  0.9255
+    #
+    # Every foreign system E098 could reach declines from the first step:
+    # pilkwang's three at w=0.1 already read 0.9211, 0.9217, 0.9223.
+    #
+    # WHY THIS PAIR AND NOT THOSE. E048's rule wants members comparable in
+    # strength and different in kind, and this is the only pair that is both:
+    #   gap        0.9223 vs 0.8980 = 0.0243, against 0.079-0.130 for the foreign
+    #              systems.
+    #   kind       resnet34 2.5D at 192 px on this project's report labels
+    #              against CoAtNet at 336/384 px on upstream's. Cross-architecture
+    #              rank correlation 0.793, where CoAtNet's own four arms sit at
+    #              0.905-0.986.
+    #   mechanism  8 of 12 findings improve, and the gain lands where CoAtNet is
+    #              WEAKEST -- Synovitis +0.016 (this project's floor since E059),
+    #              Baker's +0.022, Effusion +0.012 -- while all four losses are
+    #              findings where CoAtNet already reads 0.92-0.98 and the second
+    #              member is far behind. Decorrelation doing work, not an average
+    #              of noise.
+    #
+    # WHY IT IS ONE KERNEL AND NOT A BLEND OF TWO. `rank_blend`'s own guard says
+    # it: a mounted kernel supplies its LAST SAVED output, frozen at the 3-study
+    # visible run, so a CSV-chained blend submits three rows and spends a slot.
+    # Of 626 public notebooks, 152 mount another for its CHECKPOINTS and 3 read a
+    # submission.csv. The v1 path here is SPLICED FROM THE SAME `_shared`
+    # fragments every v1 kernel has always used, not reimplemented -- a second
+    # copy of the preprocessing is the exact skew E088 caught in kernel 81's
+    # first draft.
+    #
+    # WHAT IT IS NOT EVIDENCE OF. +0.0053 on gold-58 with a paired CI of
+    # [-0.0016, +0.0118] is NOT separated, and the board floor is +/-0.003 (E092),
+    # so this is marginal by construction. E042 found the same shape at the same
+    # w=0.3 against a different partner and never got to submit it.
+    Kernel(
+        slug="knee-gold-raptorv1",
+        directory="85_gold_raptorv1",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
+                 "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
+                 "knee-train-v1pubfull-s7"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            # THE SECOND ARCHITECTURE, ON. Five full-fit resnet34 members at
+            # this project's own v1 geometry, run in the same kernel because a
+            # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
+            # a mounted kernel supplies its last SAVED output, frozen at the
+            # 3-study visible run).
+            "V1_MEMBERS": 5,
+            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
+            # 0.938 — the same three decimals as 0.50, on a board that resolves
+            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
+            # no evidence either way and restores the default, because 0.50
+            # needs no justification and 0.40 is a number fitted on 58 studies.
+            # Keeping a fitted parameter that demonstrated nothing would be the
+            # seventh refusal quietly not happening.
+            "V1_BLEND_W": 0.50,
+            "V1_BATCH_STUDIES": V1.infer_batch,
+            "V1_SLICE_SUBSAMPLE": None,
+            "V1_INPUT_NORM": False,
+            "CHECKPOINT_GLOB": "checkpoint_fold*.pt",
+            "SKIP_DIRECTORIES": Raw('{"train_series", "test_series"}'),
+            **V1.constants(),
+            "PLANES": ("Sagittal", "Coronal", "Axial"),
+        },
+        note="THE PLUMBING CHECK, and it must run before the submission.\n"
+             "\n"
+             "Same kernel as `knee-infer-raptorv1`, pointed at the 58 expert\n"
+             "studies. It writes no submission and costs no submission.\n"
+             "\n"
+             "WHAT IT CAN AND CANNOT SHOW. The v1 members here are FULL-FIT:\n"
+             "every one trained on all 58 gold studies, so their gold number\n"
+             "is contaminated upward and is NOT a score. What it checks is\n"
+             "that the second architecture is wired correctly at all - a\n"
+             "skewed v1 path reads near 0.5, a working one reads high. That\n"
+             "is the failure mode worth a free run, because silent\n"
+             "train/inference skew is what E088 caught in kernel 81's first\n"
+             "draft and it runs, writes a submission, and is wrong.\n"
+             "\n"
+             "The four CoAtNet arms should reproduce E099 exactly:\n"
+             "0.9198 / 0.9170 / 0.9167 / 0.9116, blend 0.9223. If they move,\n"
+             "splicing the second architecture in changed the first one.\n"
+             "\n"
+             "ATTRIBUTION: as `knee-infer-raptorcc0`.",
+    ),
+    Kernel(
+        slug="knee-infer-raptorv1",
+        directory="86_infer_raptorv1",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense"],
+        depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
+                 "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
+                 "knee-train-v1pubfull-s7"],
+        constants={
+            "MEMBERS_EXPECTED": 4,
+            "ARMS": RAPTOR_ARMS,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "test",
+            "GOLD_EXPECTED": 58,
+            # THE SECOND ARCHITECTURE, ON. Five full-fit resnet34 members at
+            # this project's own v1 geometry, run in the same kernel because a
+            # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
+            # a mounted kernel supplies its last SAVED output, frozen at the
+            # 3-study visible run).
+            "V1_MEMBERS": 5,
+            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
+            # 0.938 — the same three decimals as 0.50, on a board that resolves
+            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
+            # no evidence either way and restores the default, because 0.50
+            # needs no justification and 0.40 is a number fitted on 58 studies.
+            # Keeping a fitted parameter that demonstrated nothing would be the
+            # seventh refusal quietly not happening.
+            "V1_BLEND_W": 0.50,
+            "V1_BATCH_STUDIES": V1.infer_batch,
+            "V1_SLICE_SUBSAMPLE": None,
+            "V1_INPUT_NORM": False,
+            "CHECKPOINT_GLOB": "checkpoint_fold*.pt",
+            "SKIP_DIRECTORIES": Raw('{"train_series", "test_series"}'),
+            **V1.constants(),
+            "PLANES": ("Sagittal", "Coronal", "Axial"),
+        },
+        note="THE SUBMISSION. Four CC0 CoAtNet arms (board 0.932) and five\n"
+             "full-fit resnet34 members (board 0.926), rank-blended 50/50\n"
+             "inside one kernel.\n"
+             "\n"
+             "DO NOT SUBMIT BEFORE `knee-gold-raptorv1` HAS RUN. Two\n"
+             "architectures in one kernel is two ways for a preprocessing\n"
+             "skew to hide, and the gold run is what makes this readable.\n"
+             "\n"
+             "PRE-REGISTERED, per E101:\n"
+             "  > 0.935   the offline sweep transferred and then some\n"
+             "  0.933-0.935  a real gain above the +/-0.003 board floor\n"
+             "  0.930-0.932  inside the floor; gold-58 saw a gain the board\n"
+             "               cannot, which is the E083 failure again\n"
+             "  < 0.929   below the CoAtNet arm alone, so the second member\n"
+             "            DILUTES, and E048's rule is wrong at a 0.024 gap\n"
+             "\n"
+             "The weight is 0.5 and nothing is fitted, for the fifth time.\n"
+             "The sweep's peak at w=0.3 beats 0.5 by +0.0022, which is below\n"
+             "the board's own reseed floor: a fitted weight would buy a\n"
+             "difference the board cannot measure.\n"
+             "\n"
+             "Cost: 82's four arms (2.43 h on 1,300) plus 63's five members\n"
+             "(~1.0 h), so ~3.5 h against a 9 h cap.\n"
+             "\n"
+             "ATTRIBUTION: the CoAtNet arms are Dread Development's, run\n"
+             "from the CC0 datasets `raptor-knee-maxspan`,\n"
+             "`raptor-knee-native384` and `raptor-knee-native384dense`, with\n"
+             "blend weights from the public write-up\n"
+             "`4-arm-ensemble-explained-rsna-knee-0-937`.",
     ),
     Kernel(
         slug="knee-blend-raptor",
