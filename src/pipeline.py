@@ -1787,6 +1787,155 @@ EXTRAS = [
                                  lr=6e-4, seed=3).constants()},
         note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
     ),
+    # E109. THE OLDEST CLAIM IN THE LOG, RETESTED UNDER THE LABELS IT PREDATES.
+    #
+    # `PATH.md` §1 records "architecture, every attempt: 0.000" and that line
+    # governs how every hour of GPU here gets allocated. Every experiment behind
+    # it — E012-E024, 288px, DINOv2 twice, focal top-k, per-finding pooling —
+    # ran on or before **2026-08-19**, and E041/E044 replaced the labels
+    # afterwards for **+0.1067 on the 58 gold**. So the claim was measured under
+    # labels that E044 proved were costing 0.107 of macro AUC, which is three
+    # times E060's own +/-0.03 noise floor. **An architecture effect could not
+    # have been seen through that.**
+    #
+    # AND E020 DISOWNS ITSELF. Its own entry: *"0.6878 is not a measurement of
+    # this backbone; it is where the clock stopped"* — the DINOv2 curve was
+    # still gaining 0.002 an epoch when the budget ended it at 16. Half the
+    # evidence for the project's largest standing closure is an experiment the
+    # log says was not a comparison.
+    #
+    # ONE FOLD, ONE VARIABLE. Byte-identical to `v1public` fold 0 — same cache,
+    # same 192px/0.6mm geometry, same public labels, same 24 epochs, batch and
+    # LR — with `backbone` the only difference. convnext_tiny rather than
+    # something larger, so this tests the architecture FAMILY and not capacity:
+    # 28M parameters against resnet34's 21M.
+    #
+    # THE INSTRUMENT IS THE POINT, and it is why this is worth running when a
+    # 58-study comparison would not be. Fold 0 holds out **882 studies**, every
+    # one of them report-labelled, and `knee-infer-v1pub`'s existing dump has
+    # resnet34's honest out-of-fold predictions for exactly those. The
+    # comparison is 882 paired studies, not the n~12 gold subset a single fold
+    # carries.
+    #
+    # THE ARBITER'S STATUS, STATED BEFORE THE RUN. E106 invalidated report
+    # labels for ranking OUR model against a FOREIGN one; E108 validated them
+    # within a checkpoint family at Spearman +0.800. Two of our own models,
+    # same labels, same data, same fold, differing only in backbone, is an
+    # UNTESTED MIDDLE CASE — the "rewarded for agreeing with what it was trained
+    # on" bias is common-mode here, which argues it cancels, but that argument
+    # has not been measured for this class. Read the result accordingly.
+    Kernel(
+        slug="knee-train-v1pub-cnx",
+        directory="93_train_v1pub_cnx_fold0",
+        template="train",
+        gpu=True,
+        internet=True,          # timm downloads the pretrained backbone
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUBLIC_DATASET],
+        constants={"RUN_FOLD": 0,
+                   **V1.constants(),
+                   **TrainConfig(backbone="convnext_tiny", epochs=24, batch=16,
+                                 lr=6e-4, input_norm=True, seed=3).constants()},
+        note="Retests the oldest standing claim in this project: that\n"
+             "architecture has measured zero, every time.\n"
+             "\n"
+             "Every experiment behind that claim ran on or before 2026-08-19,\n"
+             "and the labels changed afterwards for +0.1067 on gold (E044).\n"
+             "The claim was measured under labels costing 0.107 of macro AUC,\n"
+             "which is 3x E060's own noise floor - an architecture effect\n"
+             "could not have been seen through that. And E020's own entry\n"
+             "says its DINOv2 number was not a measurement of the backbone\n"
+             "but of where the epoch budget stopped.\n"
+             "\n"
+             "ONE VARIABLE: byte-identical to `knee-train-v1pub` fold 0 except\n"
+             "the backbone. input_norm=True because convnext expects ImageNet\n"
+             "normalisation and resnet34 here was trained without it - that is\n"
+             "a second difference and it is forced, not chosen; it is recorded\n"
+             "in E109 rather than hidden.\n"
+             "\n"
+             "Read it on the 882 held-out studies of fold 0, NOT on the ~12\n"
+             "gold ones a single fold carries. `knee-oof-v1pub-cnx` builds\n"
+             "that dump on CPU for zero GPU quota.\n"
+             "\n"
+             "~2-3 h. If it separates, five folds is the follow-up; if it does\n"
+             "not, PATH.md's line stands and is no longer stale.",
+    ),
+    # THE CONTROL ARM, and it exists because without it this repeats E020's own
+    # unresolved flaw. convnext needs ImageNet normalisation; the resnet34
+    # baseline was trained without it. Comparing them directly confounds the
+    # backbone with the input scaling — which is precisely what E020 flagged in
+    # 2026-08-19 (*"ImageNet normalisation on, which the resnet34 runs did not
+    # have"*) and then never separated. Repeating that would leave the stale
+    # claim replaced by an equally unreadable one.
+    #
+    # So resnet34 is re-run at fold 0 WITH normalisation. Three arms then bound
+    # both variables: the existing `knee-train-v1pub` (resnet34, no norm), this
+    # (resnet34, norm), and the convnext (norm). Backbone is read from the last
+    # two; normalisation from the first two. Cost is one extra fold, ~1.4 h.
+    Kernel(
+        slug="knee-train-v1pub-norm",
+        directory="95_train_v1pub_norm_fold0",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUBLIC_DATASET],
+        constants={"RUN_FOLD": 0,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet34", epochs=24, batch=16,
+                                 lr=6e-4, input_norm=True, seed=3).constants()},
+        note="THE CONTROL FOR `knee-train-v1pub-cnx`, and it must run.\n"
+             "\n"
+             "convnext needs ImageNet normalisation and the resnet34 baseline\n"
+             "was trained without it, so comparing them directly confounds\n"
+             "the backbone with the input scaling. E020 hit exactly this in\n"
+             "August - `ImageNet normalisation on, which the resnet34 runs did\n"
+             "not have` - and never separated it, which is half of why the\n"
+             "architecture claim is unreadable today.\n"
+             "\n"
+             "Three arms bound both variables: `knee-train-v1pub` (resnet34,\n"
+             "no norm), this one (resnet34, norm), and the convnext (norm).\n"
+             "Backbone is read from the last two; normalisation from the\n"
+             "first two.\n"
+             "\n"
+             "~1.4 h. Skipping it would replace a stale claim with an\n"
+             "equally unreadable one.",
+    ),
+    Kernel(
+        slug="knee-oof-v1pub-norm",
+        directory="96_oof_v1pub_norm",
+        template="gold_eval",
+        gpu=False,
+        internet=False,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3", "knee-train-v1pub-norm"],
+        datasets=[PUBLIC_DATASET],
+        constants={**V1.constants(), "TTA_VIEWS": ("identity",),
+                   "OOF_SCOPE": "all"},
+        note="Out-of-fold predictions from the resnet34+normalisation fold-0\n"
+             "control, for the 882 studies it held out. CPU, zero GPU quota.",
+    ),
+    Kernel(
+        slug="knee-oof-v1pub-cnx",
+        directory="94_oof_v1pub_cnx",
+        template="gold_eval",
+        gpu=False,          # 882 forward passes on CPU; zero GPU quota
+        internet=False,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3", "knee-train-v1pub-cnx"],
+        datasets=[PUBLIC_DATASET],
+        constants={**V1.constants(), "TTA_VIEWS": ("identity",),
+                   "OOF_SCOPE": "all"},
+        note="Out-of-fold predictions from the convnext fold-0 model, for the\n"
+             "882 studies it held out. The comparison arm is\n"
+             "`knee-oof-v1pub`'s existing dump, which carries resnet34's\n"
+             "honest predictions for the same 882.\n"
+             "\n"
+             "CPU, so it costs no GPU quota - the same reason\n"
+             "`knee-oof-v1pub` runs this way.",
+    ),
     # E108's READOUT: the three narrowed arms on all 4,407, to sit beside E106's
     # dump of the three published ones and be compared on the 4,349 that are not
     # the 58.

@@ -6632,3 +6632,81 @@ have endorsed the decision the entire way.**
 - **cost**: 6.6 GPU-h and no submission, to avoid shipping a change that would
   have cost roughly −0.005 on the board. **The four published arms stay exactly
   as upstream published them.**
+
+
+### E109 — PRE-REGISTERED, NOT YET RUN: the oldest claim in the log, retested under labels it predates
+- **date**: 2026-09-15, written **before** the runs. Two fold-0 trainers,
+  ~4 GPU-h of the ~9 remaining. Two CPU evals at **zero** GPU quota. No
+  submission.
+
+**THE CLAIM AND WHY IT IS STALE.** `PATH.md` §1 records *"architecture, every
+attempt: 0.000"*, and that line governs how every GPU hour here is allocated.
+Every experiment behind it — E012–E024, 288px, DINOv2 twice, focal top-k,
+per-finding pooling — ran **on or before 2026-08-19**. E041/E044 then replaced the
+labels for **+0.1067 on the 58 gold**.
+
+  **So the claim was measured under labels that E044 proved were costing 0.107 of
+  macro AUC — three times E060's own ±0.03 noise floor. An architecture effect
+  could not have been seen through that.** This is the same stale-closure shape
+  the log has caught twice already (E046's closure, E070's rank), and it is now
+  the oldest evidence still governing a decision.
+
+**AND HALF OF IT DISOWNS ITSELF.** E020, verbatim: *"0.6878 is not a measurement
+of this backbone; it is where the clock stopped"* — the DINOv2 curve was still
+gaining 0.002 an epoch when a cost-driven 16-epoch budget ended it. **One of the
+two backbone experiments behind the project's largest standing closure is one the
+log itself says was not a comparison.**
+
+**THREE ARMS, BECAUSE TWO WOULD REPEAT E020's OTHER FLAW.** convnext needs
+ImageNet normalisation; the resnet34 baseline trained without it. Comparing them
+directly confounds backbone with input scaling — which is **exactly** what E020
+flagged (*"ImageNet normalisation on, which the resnet34 runs did not have"*) and
+never separated.
+
+| arm | backbone | input_norm | seed | status |
+|---|---|---|---|---|
+| `knee-train-v1pub` | resnet34 | **False** | — | exists |
+| **`knee-train-v1pub-norm`** | resnet34 | **True** | 3 | **the control, ~1.4 h** |
+| **`knee-train-v1pub-cnx`** | **convnext_tiny** | True | 3 | **the treatment, ~2–3 h** |
+
+- **backbone is read from the last two**, which differ in nothing else. That is
+  the primary question and it is clean.
+- **normalisation is read from the first two, and that reading is CONFOUNDED BY
+  SEED** — the incumbent was trained with `seed=None` and the control with seed 3.
+  E060 measured a pure reseed at −0.0284 on n=58. On 882 studies the seed effect
+  is far smaller but not zero. **Stated now so it is not read as clean later.**
+
+**THE INSTRUMENT IS WHY THIS IS WORTH RUNNING.** Fold 0 holds out **882 studies**,
+every one report-labelled, and `knee-oof-v1pub`'s dump already carries resnet34's
+honest out-of-fold predictions for exactly those. **The comparison is 882 paired
+studies, not the ~12 gold a single fold carries** — which is the reason every
+previous one-fold architecture probe here was unreadable.
+
+  **THE ARBITER'S STATUS, STATED FIRST.** E106 invalidated report labels for
+  ranking our model against a **foreign** one (+0.052); E108 validated them
+  **within a checkpoint family** (+0.800). Two of our own models, same labels,
+  same data, same fold, differing only in backbone, is an **untested middle
+  case**. The "rewarded for agreeing with what it was trained on" bias is
+  common-mode here, which argues it cancels — **but that argument has not been
+  measured for this class, and E108 exists precisely because I over-generalised
+  the last one.**
+
+**ACCEPTANCE, FIXED NOW.**
+
+1. **convnext beats resnet34-norm on the 882 by more than its paired CI** → the
+   architecture claim is stale and `PATH.md` §1 is wrong; five folds follows.
+2. **Not separated** → the claim survives its retest and is **no longer stale**,
+   which is worth 4 GPU-h on its own: it currently rests on evidence three
+   label-generations old.
+3. **convnext loses** → same as 2, more strongly.
+4. **gold-58 is not the instrument here.** A single fold carries ~12 gold
+   studies. Any gold number from these runs is reported for completeness and
+   **will not decide anything**.
+5. **If the 882-study reading and the ~12-study gold reading disagree in sign**,
+   that is a finding about the arbiter, not about the backbone, and the entry
+   says so rather than picking the flattering one.
+
+- **cost**: ~4 GPU-h of ~9, no submission. **The honest expectation is rule 2.**
+  Labels and data are +0.166 of this project's +0.201 and that decomposition is
+  not in question — what is in question is whether a line written under
+  0.107-worse labels should still be steering decisions.
