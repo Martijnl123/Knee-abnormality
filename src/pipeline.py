@@ -1787,6 +1787,72 @@ EXTRAS = [
                                  lr=6e-4, seed=3).constants()},
         note="ARM B, THE CONTROL, and it must be run. Same 4,349 studies as\n`knee-train-lab-dread`, labelled by the incumbent\n`stevenleehans` set instead.\n\nWithout it the comparison is against `knee-infer-v1pub`'s 0.8980,\nwhich is a FIVE-FOLD OUT-OF-FOLD number from models that each saw\n80% of the corpus. Reading a full-fit arm against it would confound\nthe label change with the data change - and E060 is in this log\nprecisely because a claim was made without a control arm.\n\nIt is also worth having on its own: the incumbent labels have never\nbeen measured at full corpus with an honest holdout, because the\nfull-fit lineage trains on the gold and cannot be scored.\n\nATTRIBUTION: labels from `stevenleehans/rsna-knee-llm-report-labels`,\nCC0-1.0, as `knee-train-v1pub`.",
     ),
+    # E110b. A SIXTH v1 MEMBER, BUILT TO REACH THE BOARD RATHER THAN TO SETTLE
+    # A QUESTION.
+    #
+    # The shipped blend's v1 half is five full-fit resnet34. This adds a sixth
+    # member that is a DIFFERENT DEPTH on the same labels and geometry. It is not
+    # an experiment: a full-fit model trains on all 58 gold and so cannot be
+    # scored offline at all (E083, `knee-infer-v1pubfull5`). The board is the only
+    # judge, the board keeps a team's best submission, and 0.938 is banked — so
+    # the cost of being wrong is one click.
+    #
+    # WHY resnet50 AND NOT A FOLD PROBE. A fold-0 resnet50 would be the readable
+    # experiment, and it cannot ship: a fold-0 win needs five folds (~7 GPU-h)
+    # before anything reaches the board, which does not fit the quota left. This
+    # is the version that can.
+    #
+    # input_norm=False, AND THAT IS E109's ONE DELIVERED FINDING BEING USED.
+    # E109's control measured ImageNet normalisation at **-0.0064** on fold 0's
+    # 882 held-out studies, CI [-0.0113, -0.0014] — it HURTS this lineage. The
+    # incumbent had it off by default rather than by measurement; this arm has it
+    # off on purpose.
+    #
+    # batch 8 x 2 accumulation rather than 16 x 1: resnet50's activations are
+    # roughly twice resnet34's and each study is 60 images, so batch 16 is 960
+    # forward passes of them — the size that OOMed the T4 in E109. UNLIKE that
+    # entry's convnext this is a BatchNorm backbone, so accumulation is NOT
+    # exactly equivalent to the larger batch. That is acceptable here and would
+    # not have been in E109: this is an ensemble member, not a controlled
+    # comparison, so differing batch statistics cost nothing readable.
+    Kernel(
+        slug="knee-train-v1pubfull-r50",
+        directory="97_train_v1pubfull_r50",
+        template="train",
+        gpu=True,
+        internet=True,
+        depends=["knee-cache-build-0", "knee-cache-build-1", "knee-cache-build-2",
+                 "knee-cache-build-3"],
+        datasets=[PUBLIC_DATASET],
+        constants={"RUN_FOLD": -1,
+                   **V1.constants(),
+                   **TrainConfig(backbone="resnet50", epochs=24, batch=8, accum=2,
+                                 lr=6e-4, input_norm=False, seed=3).constants()},
+        note="A SIXTH v1 MEMBER FOR THE SHIPPED BLEND, not an experiment.\n"
+             "\n"
+             "Full fit on all 4,407 studies, so it cannot be scored offline -\n"
+             "it trains on all 58 gold. The board is the only judge, it keeps\n"
+             "our best submission, and 0.938 is banked, so being wrong costs\n"
+             "one click.\n"
+             "\n"
+             "resnet50 rather than a deeper change because it is the one new\n"
+             "member buildable in the quota left. A fold-0 probe would be the\n"
+             "readable experiment and could not ship: a win there still needs\n"
+             "five folds before anything reaches the board.\n"
+             "\n"
+             "input_norm=False ON PURPOSE. E109 measured ImageNet\n"
+             "normalisation at -0.0064 on 882 held-out studies, CI\n"
+             "[-0.0113, -0.0014] - it hurts this lineage. The incumbent had it\n"
+             "off by default; this has it off by measurement.\n"
+             "\n"
+             "batch 8 x 2 accumulation because resnet50 at batch 16 is the\n"
+             "size that OOMed the T4 in E109. resnet50 is BatchNorm, so that\n"
+             "is not exactly equivalent to batch 16 - acceptable for an\n"
+             "ensemble member, and it would not have been for E109's\n"
+             "controlled comparison.\n"
+             "\n"
+             "~1.5 h.",
+    ),
     # E109. THE OLDEST CLAIM IN THE LOG, RETESTED UNDER THE LABELS IT PREDATES.
     #
     # `PATH.md` §1 records "architecture, every attempt: 0.000" and that line
