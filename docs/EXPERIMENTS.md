@@ -6535,7 +6535,7 @@ which would have printed 0.941. It printed 0.938.
   been argued six times is now answered on the only instrument that counts.
 
 
-### E108 — E106 was over-generalised, and narrowing it reopens the span question
+### E108 — E106 was over-generalised; the span question reopened and closed 0 for 3
 - **date**: 2026-09-14. The measurement below is CPU-only on files already on
   disk. The run it justifies (`knee-trainall-span04`, ~6.6 GPU-h) is **pushed and
   pending**; its acceptance rules are fixed here before it lands.
@@ -6592,3 +6592,43 @@ have been the only thing testing it.**
    model, which is the class E108 has just shown the proxy *can* rank.
 
 - **cost**: ~6.6 GPU-h of the ~16 remaining, no submission, no new asset.
+
+**RESULT (2026-09-15). ZERO OF THREE, AND EVERY SIGN IS REVERSED.** 4,407
+studies, 0 fallbacks, 15,839 s.
+
+| checkpoint | published | span04 | delta on 4,349 | 95% CI | **gold-58 said** |
+|---|---:|---:|---:|---|---:|
+| maxspan-v5 | 0.9151 | 0.9082 | **−0.0068** | [−0.0077, −0.0061] | **+0.0055** |
+| native384dense-v10 | 0.9119 | 0.9057 | **−0.0062** | [−0.0070, −0.0054] | **+0.0049** |
+| native384-v8 | 0.9085 | 0.8967 | **−0.0119** | [−0.0133, −0.0105] | **+0.0017** |
+
+  **Rule 2 fires. The route closes for good.** Not "not separated" — reversed,
+  with intervals an order of magnitude tighter than gold-58 can produce, on the
+  arbiter E108 validated at Spearman +0.800 for exactly this comparison class.
+
+**WHAT E103's SIX-FOR-SIX ACTUALLY WAS.** It read as a sign test at p ≈ 0.016 and
+E103 said so while noting the pairs were not independent. They were far less
+independent than that hedge implied: **six variants of three checkpoints, all
+scored on the same 58 studies.** That is one correlated fluctuation read six
+times, not six votes. **The correction is not "n=58 is noisy" — it is that
+repeating a comparison across variants of the same thing on the same tiny sample
+manufactures confidence without adding evidence.**
+
+**AND THE TRAP THIS AVOIDED WAS THE OBVIOUS MOVE.** `maxspan-v5-span04` at
+**0.9253** is still, on gold-58, the highest single arm this project has ever
+measured — above the published four-arm blend itself. Shipping it would have made
+the submission **worse**, by roughly 0.007 of arm quality, and **gold-58 would
+have endorsed the decision the entire way.**
+
+- **upstream's published spans are right**, and the tighter the crop the worse
+  every arm gets, monotonically in the one step tested. The wide span is carrying
+  signal at the edges of each series, not noise.
+- **the instrument worked, which is the reusable part.** E108's first half
+  established that the report-label proxy ranks *within* a checkpoint family at
+  Spearman +0.800 while ranking *across* families at +0.052; this is that
+  boundary being used, and returning an answer gold-58 could not have reached and
+  actively contradicted. **A validated arbiter with 75× the sample overturned a
+  six-for-six result from the small one.**
+- **cost**: 6.6 GPU-h and no submission, to avoid shipping a change that would
+  have cost roughly −0.005 on the board. **The four published arms stay exactly
+  as upstream published them.**
