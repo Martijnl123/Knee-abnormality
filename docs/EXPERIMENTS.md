@@ -6815,3 +6815,66 @@ first**, fixed before the comparison ran:
   learned per-finding plane weight is 36 parameters"* — the exact shape of the
   confident claim this project has retracted repeatedly. **The test that killed it
   cost four minutes.**
+
+
+### E111 — a sixth v1 member, shipped without an offline number because there cannot be one
+- **date**: 2026-09-15. `knee-train-v1pubfull-r50`, **~3.5 GPU-h**, all 24 epochs,
+  export taken at epoch 20 as configured. One submission pending a human click.
+
+**WHAT IT IS.** The blend's v1 half was five full-fit resnet34. This adds a sixth
+at a **different depth** on the same labels, same 192 px / 0.6 mm geometry, same
+24 epochs. A full-fit model trains on all 58 gold, so **it cannot be scored
+offline at all** — the log line reads *"gold 1.0000 … memorisation, not a
+score"*, which is correct and is the whole reason this is a board question.
+
+**WHY IT SHIPS UNVALIDATED, WHICH IS NORMALLY REFUSED HERE.** The board keeps a
+team's best submission and **0.938 is banked**, so the cost of being wrong is one
+click. That is the only justification and it is the same one E107 used. It is
+*not* a licence to ship blind when an offline instrument exists — for this
+lineage, none can.
+
+**TWO SETTINGS CAME FROM MEASUREMENTS RATHER THAN DEFAULTS.**
+
+- **`input_norm=False`**, because **E109's control measured ImageNet
+  normalisation at −0.0064** on fold 0's 882 held-out studies, CI [−0.0113,
+  −0.0014]. The incumbent five have it off by accident; this one has it off on
+  purpose. **E109's only delivered result, used.**
+- **batch 8 × 2 accumulation**, because resnet50 at batch 16 is the size that
+  OOMed the T4 twice in E109 — each study is 60 images, so a batch of 16 is 960
+  of them. **resnet50 is BatchNorm, so accumulation is NOT exactly equivalent**
+  to the larger batch, unlike E109's convnext with LayerNorm. Acceptable for an
+  ensemble member; it would not have been for a controlled comparison.
+
+**A COST ESTIMATE THAT WAS WRONG BY 2.5×, RECORDED BECAUSE IT DECIDED A PLAN.**
+It was launched as *"~1.5 h"*. It took **~3.5 h**. The arithmetic that was not
+done first: halving the batch **doubles the steps per epoch** (551 against 276)
+and resnet50 costs roughly twice resnet34 per image. **The batch reduction was
+this project's own change, so its cost was foreseeable and was not foreseen** —
+and on a near-exhausted weekly quota that estimate was the reason a fold-0 probe
+was rejected in its favour.
+
+- **the run also risked producing nothing**, which was flagged before it landed:
+  the full-fit export fires at **exactly** `epoch == min(FULL_FIT_EPOCH, epochs-1)`,
+  so a 7.5 h budget stopping it at epoch 19 would have left no checkpoint. It
+  reached epoch 23.
+- **verified before wiring, not assumed**: the checkpoint reads `backbone
+  resnet50`, `input_norm False`, 324 tensors.
+
+**PRE-REGISTERED, before the board sees it.** Against the incumbent 0.938:
+
+| board | reading |
+|---|---|
+| **≥ 0.941** | the sixth member pays |
+| 0.936–0.940 | inside the ±0.003 floor — **revert to five**, which needs no justification |
+| **≤ 0.935** | it dilutes; revert and close the "add another v1 member" route |
+
+- **the honest expectation is the middle bracket.** E064 priced additional
+  same-lineage members at **+0.001**, and a depth change is more than a reseed
+  and less than a new architecture family. **This is a cheap shot with a
+  mechanism, not a plan.**
+- **a test was loosened, and deliberately.** `test_the_member_count_is_declared_
+  and_matches_the_trainers_mounted` asserted `== 5` and failed on a correct
+  change. It now asserts the **invariant** — declared count equals trainers
+  mounted — because a test pinning a number it does not care about turns every
+  legitimate edit into a failure and teaches people to edit tests without reading
+  them.

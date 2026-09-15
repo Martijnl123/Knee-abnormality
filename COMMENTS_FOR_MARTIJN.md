@@ -235,6 +235,26 @@ measured before you use it.
 
 ---
 
+## 9b. In flight right now (E111)
+
+The blend's v1 half is being taken from five full-fit resnet34 to **six**, the
+extra one a full-fit **resnet50** — same labels, same geometry, different depth.
+
+It ships **without an offline number and cannot have one**: a full-fit model
+trains on all 58 gold, so its gold score is memorisation. The justification is
+narrow — the board keeps our best submission and 0.938 is banked, so being wrong
+costs one click. It is not a general licence to ship blind.
+
+`input_norm=False` on that arm is **E109's one delivered finding being used**:
+normalisation measured −0.0064 on this lineage.
+
+Expect the middle bracket. E064 priced extra same-lineage members at +0.001, and
+a depth change is more than a reseed and less than a new family. If the board
+reads 0.936–0.940 the correct move is **revert to five**, because five needs no
+justification.
+
+---
+
 ## 10. One thing that is NOT in main, on purpose
 
 `origin/rsna-knee-abnormality-pipeline` is an abandoned branch from 2026-08-20

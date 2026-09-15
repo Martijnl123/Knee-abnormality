@@ -114,7 +114,13 @@ def test_the_member_count_is_declared_and_matches_the_trainers_mounted(slug):
     declared. E061 verified this by reading a log afterwards, which is not a
     guard."""
     kernel = _kernel(slug)
-    assert kernel.constants["V1_MEMBERS"] == len(kernel.depends) == 5
+    # The INVARIANT, not the number. E111 added a sixth member and this read
+    # `== 5`, so it failed on a correct change -- a test that pins a count it
+    # does not care about turns every legitimate edit into a failure and trains
+    # people to edit the test without reading it. What matters is that the
+    # declared count equals the trainers actually mounted.
+    assert kernel.constants["V1_MEMBERS"] == len(kernel.depends)
+    assert kernel.constants["V1_MEMBERS"] >= 5, "the v1 half has lost members"
 
 
 @pytest.mark.parametrize("slug", V1_SLUGS)

@@ -2299,7 +2299,11 @@ EXTRAS = [
                   "dreaddevelopment/raptor-knee-native384dense"],
         depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
                  "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
-                 "knee-train-v1pubfull-s7"],
+                 "knee-train-v1pubfull-s7",
+                 # E111's sixth member: full-fit resnet50 at the same labels and
+                 # geometry, input_norm=False like the other five (E109 measured
+                 # normalisation at -0.0064 on this lineage).
+                 "knee-train-v1pubfull-r50"],
         constants={
             "MEMBERS_EXPECTED": 4,
             "ARMS": RAPTOR_ARMS,
@@ -2314,7 +2318,7 @@ EXTRAS = [
             # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
-            "V1_MEMBERS": 5,
+            "V1_MEMBERS": 6,
             # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
             # 0.938 — the same three decimals as 0.50, on a board that resolves
             # to 0.001. The pre-registration said the 0.936-0.940 bracket means
@@ -2362,7 +2366,11 @@ EXTRAS = [
                   "dreaddevelopment/raptor-knee-native384dense"],
         depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
                  "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
-                 "knee-train-v1pubfull-s7"],
+                 "knee-train-v1pubfull-s7",
+                 # E111's sixth member: full-fit resnet50 at the same labels and
+                 # geometry, input_norm=False like the other five (E109 measured
+                 # normalisation at -0.0064 on this lineage).
+                 "knee-train-v1pubfull-r50"],
         constants={
             "MEMBERS_EXPECTED": 4,
             "ARMS": RAPTOR_ARMS,
@@ -2377,7 +2385,7 @@ EXTRAS = [
             # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
-            "V1_MEMBERS": 5,
+            "V1_MEMBERS": 6,
             # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
             # 0.938 — the same three decimals as 0.50, on a board that resolves
             # to 0.001. The pre-registration said the 0.936-0.940 bracket means
