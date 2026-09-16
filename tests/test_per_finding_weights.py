@@ -235,15 +235,22 @@ def test_the_whole_pipeline_recovers_a_planted_per_finding_structure(tmp_path, c
 # E116's shipped vector
 # --------------------------------------------------------------------------- #
 def _shipped_vector():
-    """The twelve weights the manifest actually ships, read from the manifest."""
+    """Any per-finding V1_BLEND_W the manifest currently ships, or None.
+
+    E116 shipped one and the board retired it, so the usual answer is None. The
+    invariants below still have to hold the day someone ships one again, which is
+    the whole reason this reads the manifest instead of a constant.
+    """
     import src.pipeline as pipeline
 
     found = {}
     for kernel in pipeline.all_kernels():
         cfg = getattr(kernel, "constants", None) or {}
-        if "V1_BLEND_W" in cfg and not isinstance(cfg["V1_BLEND_W"], float):
-            found[kernel.slug] = tuple(cfg["V1_BLEND_W"])
-    assert found, "no kernel ships a per-finding V1_BLEND_W"
+        w = cfg.get("V1_BLEND_W")
+        if w is not None and not isinstance(w, float):
+            found[kernel.slug] = tuple(w)
+    if not found:
+        return None
     assert len(set(found.values())) == 1, (
         f"kernels disagree on the shipped weights: {found}. The gold kernel and "
         "the submission must blend identically or the gold number is about a "
@@ -251,45 +258,49 @@ def _shipped_vector():
     return next(iter(found.values()))
 
 
-def test_the_shipped_weights_are_reproduced_by_the_one_sided_rule():
-    """The manifest's twelve constants must be DERIVABLE, not just plausible.
+def test_the_rule_reproduces_the_vector_e116_shipped():
+    """The derivation must stay checkable after the board retired its output.
 
-    E106 fitted weights against CoAtNet's in-sample predictions and lost; E113
-    found why. E116's claim is that its weights never touch CoAtNet. A claim like
-    that is worth exactly as much as the code that reproduces it, so this
-    re-derives the shipped vector from our arm's out-of-fold AUCs alone.
+    E106 fitted per-finding weights against CoAtNet's in-sample predictions and
+    lost; E113 found why. E116's claim was that its weights never touch CoAtNet,
+    and a claim like that is worth exactly as much as the code reproducing it.
+    E116 scored 0.940 -- the same as the scalar -- so the vector is shelved, but
+    "shelved by a measurement" only means anything if the rule still runs.
 
-    Tolerance is 0.001 because E116 publishes those AUCs rounded to three
-    decimals while the original derivation ran on full precision. Nine of the
-    twelve match exactly; the three that do not are off by one unit in the last
-    place, which is rounding and not a different formula.
+    Tolerance is 0.001 because E116 publishes its AUCs rounded to three decimals
+    while the original derivation ran at full precision. Nine of twelve match
+    exactly; the three that do not are off by one unit in the last place.
     """
     derived = pfw.one_sided_weights(pfw.V1_OOF_AUC_E116)
-    shipped = np.array(_shipped_vector())
+    recorded = np.array(pfw.V1_BLEND_W_E116)
 
-    assert derived.shape == shipped.shape == (12,)
-    assert np.max(np.abs(derived - shipped)) <= 0.001 + 1e-12, (
-        "the shipped weights are not reproduced by the one-sided rule: "
-        f"{dict(zip(pfw.FINDINGS, np.round(derived - shipped, 4), strict=True))}")
-    # The manifest carries the derived vector rounded to three decimals, so
-    # the exact-match count is against the rounded form.
-    assert np.sum(np.abs(np.round(derived, 3) - shipped) > 1e-9) <= 3
+    assert derived.shape == recorded.shape == (12,)
+    assert np.max(np.abs(derived - recorded)) <= 0.001 + 1e-12, (
+        "the recorded E116 vector is not reproduced by the one-sided rule: "
+        f"{dict(zip(pfw.FINDINGS, np.round(derived - recorded, 4), strict=True))}")
+    assert np.sum(np.abs(np.round(derived, 3) - recorded) > 1e-9) <= 3
 
 
-def test_the_shipped_weights_never_exceed_one_half():
-    """One-sidedness is the argument that replaces a free parameter.
+def test_any_per_finding_vector_the_manifest_ships_is_derivable_and_one_sided():
+    """Vacuous today, and deliberately kept.
 
-    If any weight rose above 0.50 the rule would be claiming our arm BEATS
-    CoAtNet on that finding, which learning its own labels well is no evidence
-    of. A vector that broke this would be a fit wearing the rule's clothes.
+    The manifest ships the scalar 0.50 because the board retired E116's vector.
+    The day someone reinstates a per-finding vector, it must be reproducible from
+    our arm's out-of-fold AUCs and must not claim -- by rising above 0.50 -- that
+    our arm beats CoAtNet on a finding, which learning its own labels well is no
+    evidence of. A fit wearing the rule's clothes would break both.
     """
-    shipped = np.array(_shipped_vector())
+    shipped = _shipped_vector()
+    if shipped is None:
+        pytest.skip("the manifest ships a scalar blend weight")
+    shipped = np.array(shipped)
     assert np.all(shipped <= 0.5 + 1e-12), (
         f"weights above 0.5: "
         f"{[pfw.FINDINGS[k] for k in np.flatnonzero(shipped > 0.5)]}")
-    assert np.isclose(shipped.max(), 0.5), (
-        "no finding sits at the 0.50 reference, so the best-learned column is "
-        "not the reference and a constant has crept in")
+    derived = pfw.one_sided_weights(pfw.V1_OOF_AUC_E116)
+    assert np.max(np.abs(derived - shipped)) <= 0.001 + 1e-12, (
+        "a per-finding vector is shipped that the one-sided rule does not "
+        "reproduce; it was fitted somewhere else and E106 is the precedent")
 
 
 def test_an_arm_at_chance_refuses_rather_than_inventing_a_weight():

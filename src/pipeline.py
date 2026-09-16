@@ -2299,11 +2299,7 @@ EXTRAS = [
                   "dreaddevelopment/raptor-knee-native384dense"],
         depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
                  "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
-                 "knee-train-v1pubfull-s7",
-                 # E111's sixth member: full-fit resnet50 at the same labels and
-                 # geometry, input_norm=False like the other five (E109 measured
-                 # normalisation at -0.0064 on this lineage).
-                 "knee-train-v1pubfull-r50"],
+                 "knee-train-v1pubfull-s7"],
         constants={
             "MEMBERS_EXPECTED": 4,
             "ARMS": RAPTOR_ARMS,
@@ -2318,30 +2314,30 @@ EXTRAS = [
             # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
-            "V1_MEMBERS": 6,
-            # E116: ONE WEIGHT PER FINDING, derived WITHOUT touching gold-58 and
-            # WITHOUT touching CoAtNet's predictions — which is what makes it
-            # legal after E113 found those predictions are in-sample on the 4,349.
             #
-            # The rule: weight our arm in proportion to how well it learned its
-            # OWN supervision, measured as its honest out-of-fold AUC against its
-            # own training labels on the 4,349 non-gold studies. Where our model
-            # failed to learn what it was taught it is contributing noise to that
-            # column, and MCL is the worst at 0.778.
+            # BACK TO FIVE, per E111's own pre-registered rule. The resnet50
+            # sixth member moved the board 0.938 -> 0.940, which is inside the
+            # +/-0.003 reseed floor E092 established, so it has not been shown to
+            # do anything. The 0.940 stays banked whatever this says -- the board
+            # keeps a team's best -- so the revert costs nothing and keeping it
+            # would be banking a number the instrument cannot resolve.
+            "V1_MEMBERS": 5,
+            # BACK TO THE SCALAR, per E116's pre-registration. E116 shipped one
+            # weight per finding, derived without touching gold-58 and without
+            # touching CoAtNet's predictions -- leakage-free by construction,
+            # worth +0.0023 on held-out gold with P(better) 0.897, and recovering
+            # 72% of the loss E105's oracle had measured on MCL specifically.
             #
-            # ONE-SIDED, and that is an argument rather than a knob: fitting your
-            # own labels well is NOT evidence you beat the other arm, so nothing
-            # rises above 0.50. The reference is the best-learned column, which is
-            # a datum in the data, not a tuned constant.
+            # THE BOARD RETURNED 0.940, THE SAME NUMBER THE SCALAR 0.50 SCORED.
+            # Not worse -- identical. So on 1,300 studies the per-finding
+            # structure is worth nothing measurable, and the pre-registered rule
+            # for that bracket was revert, which needs no justification.
             #
-            # E107 ALREADY RAN THE CONTROL. It submitted a uniform 0.40 against
-            # 0.50 and the board returned 0.938 both times, so a flat shift toward
-            # CoAtNet is known to do nothing. The mean weight here is 0.43, which
-            # means any board movement is attributable to the PER-FINDING
-            # STRUCTURE and not to the overall shift. That control was run for a
-            # different question and happens to be exactly the one this needs.
-            "V1_BLEND_W": (0.406, 0.348, 0.500, 0.455, 0.456, 0.388,
-                           0.380, 0.408, 0.403, 0.487, 0.426, 0.452),
+            # `one_sided_weights` in `eda/per_finding_weights.py` keeps the rule
+            # and its input table, so reinstating the vector is one line if a
+            # future instrument can resolve +0.002. The reason it is not shipped
+            # is a measurement, not a doubt about the derivation.
+            "V1_BLEND_W": 0.50,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
@@ -2381,11 +2377,7 @@ EXTRAS = [
                   "dreaddevelopment/raptor-knee-native384dense"],
         depends=["knee-train-v1pubfull", "knee-train-v1pubfull-s4",
                  "knee-train-v1pubfull-s5", "knee-train-v1pubfull-s6",
-                 "knee-train-v1pubfull-s7",
-                 # E111's sixth member: full-fit resnet50 at the same labels and
-                 # geometry, input_norm=False like the other five (E109 measured
-                 # normalisation at -0.0064 on this lineage).
-                 "knee-train-v1pubfull-r50"],
+                 "knee-train-v1pubfull-s7"],
         constants={
             "MEMBERS_EXPECTED": 4,
             "ARMS": RAPTOR_ARMS,
@@ -2400,30 +2392,30 @@ EXTRAS = [
             # CSV-chained blend cannot work here (see `rank_blend`'s own guard:
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
-            "V1_MEMBERS": 6,
-            # E116: ONE WEIGHT PER FINDING, derived WITHOUT touching gold-58 and
-            # WITHOUT touching CoAtNet's predictions — which is what makes it
-            # legal after E113 found those predictions are in-sample on the 4,349.
             #
-            # The rule: weight our arm in proportion to how well it learned its
-            # OWN supervision, measured as its honest out-of-fold AUC against its
-            # own training labels on the 4,349 non-gold studies. Where our model
-            # failed to learn what it was taught it is contributing noise to that
-            # column, and MCL is the worst at 0.778.
+            # BACK TO FIVE, per E111's own pre-registered rule. The resnet50
+            # sixth member moved the board 0.938 -> 0.940, which is inside the
+            # +/-0.003 reseed floor E092 established, so it has not been shown to
+            # do anything. The 0.940 stays banked whatever this says -- the board
+            # keeps a team's best -- so the revert costs nothing and keeping it
+            # would be banking a number the instrument cannot resolve.
+            "V1_MEMBERS": 5,
+            # BACK TO THE SCALAR, per E116's pre-registration. E116 shipped one
+            # weight per finding, derived without touching gold-58 and without
+            # touching CoAtNet's predictions -- leakage-free by construction,
+            # worth +0.0023 on held-out gold with P(better) 0.897, and recovering
+            # 72% of the loss E105's oracle had measured on MCL specifically.
             #
-            # ONE-SIDED, and that is an argument rather than a knob: fitting your
-            # own labels well is NOT evidence you beat the other arm, so nothing
-            # rises above 0.50. The reference is the best-learned column, which is
-            # a datum in the data, not a tuned constant.
+            # THE BOARD RETURNED 0.940, THE SAME NUMBER THE SCALAR 0.50 SCORED.
+            # Not worse -- identical. So on 1,300 studies the per-finding
+            # structure is worth nothing measurable, and the pre-registered rule
+            # for that bracket was revert, which needs no justification.
             #
-            # E107 ALREADY RAN THE CONTROL. It submitted a uniform 0.40 against
-            # 0.50 and the board returned 0.938 both times, so a flat shift toward
-            # CoAtNet is known to do nothing. The mean weight here is 0.43, which
-            # means any board movement is attributable to the PER-FINDING
-            # STRUCTURE and not to the overall shift. That control was run for a
-            # different question and happens to be exactly the one this needs.
-            "V1_BLEND_W": (0.406, 0.348, 0.500, 0.455, 0.456, 0.388,
-                           0.380, 0.408, 0.403, 0.487, 0.426, 0.452),
+            # `one_sided_weights` in `eda/per_finding_weights.py` keeps the rule
+            # and its input table, so reinstating the vector is one line if a
+            # future instrument can resolve +0.002. The reason it is not shipped
+            # is a measurement, not a doubt about the derivation.
+            "V1_BLEND_W": 0.50,
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,

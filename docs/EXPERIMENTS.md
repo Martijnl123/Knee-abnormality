@@ -7321,3 +7321,59 @@ fallbacks 0/3 on every arm | wrote submission.csv rows=3
   Kaggle's bookkeeping; the code is the audited code.
 - **the heaviest arm group projects 1.13 h over 1,300 studies**, so the four-arm
   plus six-member blend has room under the 9 h cap.
+
+**RESULT (2026-09-16). BOARD 0.940 — THE SAME NUMBER, NOT A WORSE ONE.** The
+per-finding vector scored **exactly what the scalar 0.50 scored**. That is the
+middle bracket, and the pre-registered rule for it was *revert to the scalar,
+which needs no justification*. **`V1_BLEND_W` is back to 0.50.**
+
+**WHAT THIS ACTUALLY MEASURED, stated carefully.** The rule was leakage-free by
+construction, worth **+0.0023 on held-out gold** with P(better) 0.897, and it
+recovered **72%** of the loss E105's oracle had independently measured on MCL.
+None of that is withdrawn — **the derivation was audited and holds**. What the
+board says is that on ~1,300 studies the structure is worth **less than the
+instrument can see**, which is a different statement from "the reasoning was
+wrong". E106's closure is therefore **not** vindicated on its original grounds —
+its mechanism was leakage (E113) and remains corrected — but its *conclusion*,
+that per-finding weighting does not pay here, now stands on a clean instrument.
+
+**AND THE FOUR SUBMISSIONS NOW FORM A 2x2, which is worth more than E116 was.**
+
+| | blend 0.40 / 0.43 | blend 0.50 |
+|---|---:|---:|
+| **five members** | 0.938 (E107) | 0.938 |
+| **six members** | **0.940** (E116, mean 0.43) | **0.940** (E111) |
+
+  **Member count moved the board +0.002 twice. Blend weight moved it 0.000
+  twice.** Neither margin escapes the ±0.003 reseed floor, so nothing here is
+  resolved — but a +0.002 **reproduced under a nuisance change** is better
+  evidence than a single +0.002, and a null reproduced under two member counts is
+  a firmer null. This was not designed; it fell out of four submissions spent on
+  other questions, and it is recorded because it is the cheapest thing in the log.
+
+**BOTH PRE-REGISTERED REVERTS FIRED, and neither was renegotiated after seeing
+the number.** `V1_BLEND_W` back to 0.50 (E116's rule) and `V1_MEMBERS` back to 5
+(E111's rule, owed since this morning and deliberately deferred so that this
+submission stayed a one-variable test). The banked 0.940 is untouched — the board
+keeps a team's best — so **both reverts cost nothing and buy an honest manifest**.
+
+- **the stale kernel header fixed itself.** It claimed "five full-fit resnet34
+  members … rank-blended 50/50", which was wrong for a day and is now, after the
+  reverts, an exact description of the kernel. Left as it is rather than rewritten.
+- **the rule is kept, not deleted.** `one_sided_weights` and its AUC table stay in
+  `eda/per_finding_weights.py` with four tests. Reinstating the vector is one
+  line if a future instrument can resolve +0.002. **It is shelved by a
+  measurement, not by a doubt about the derivation.**
+- **what remains open**: the reseed control on the sixth member (~3.5 GPU-h,
+  quota spent) is the only thing that separates +0.002 of member from +0.002 of
+  draw, and it now settles E111 and the 2x2 at once.
+- **the reverts broke the tests written two hours earlier, and the fix is the
+  interesting part.** Those tests read the shipped vector out of the manifest and
+  pinned it; reverting to a scalar left them pinning nothing and they failed. The
+  lazy repair is to delete them. Instead the guarantee is split in two: one test
+  reproduces **the vector E116 shipped**, now recorded in
+  `eda/per_finding_weights.py` as `V1_BLEND_W_E116` precisely because the board
+  retired it, so the derivation stays runnable after it stopped being live; the
+  other **skips while a scalar ships** and enforces derivable-and-one-sided the
+  day anyone reinstates a vector. A rule shelved by a measurement has to stay
+  re-runnable, or "shelved by a measurement" is just a sentence.

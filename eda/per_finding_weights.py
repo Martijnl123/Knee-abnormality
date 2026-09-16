@@ -63,6 +63,14 @@ V1_OOF_AUC_E116 = {
     "Baker's": 0.889, "Contusion": 0.841, "Fracture": 0.862,
 }
 
+# The vector E116 actually shipped and submitted, recorded because the board
+# retired it: 0.940, the same score the scalar 0.50 returns, so the manifest went
+# back to the scalar. It is kept here so the derivation stays checkable after it
+# stopped being the shipped value -- a rule nobody can re-run is a rule nobody can
+# trust, and this one may be worth reinstating if a finer instrument ever arrives.
+V1_BLEND_W_E116 = (0.406, 0.348, 0.500, 0.455, 0.456, 0.388,
+                   0.380, 0.408, 0.403, 0.487, 0.426, 0.452)
+
 
 def auc(y, p):
     """Mann-Whitney AUC with average ranks for ties.

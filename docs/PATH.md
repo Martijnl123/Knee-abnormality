@@ -1,8 +1,18 @@
 # What is left, what it is worth, and what 0.95 actually requires
 
-Standing: **0.938 on the leaderboard** (2026-09-14, `knee-infer-raptorv1` — the
-four CC0 CoAtNet arms blended 50/50 with five full-fit resnet34 members, E105),
-previously 0.932 (E097), 0.928, 0.926, 0.924, 0.923, 0.846 and 0.725.
+Standing: **0.940 on the leaderboard** (2026-09-16, `knee-infer-raptorv1` — the
+four CC0 CoAtNet arms blended with this project's own resnet34 lineage),
+previously 0.938 (E105), 0.932 (E097), 0.928, 0.926, 0.924, 0.923, 0.846, 0.725.
+
+**0.940 has now been reached by two different configurations and 0.938 by two
+others, which makes a 2x2 out of four submissions**: five members scored 0.938 at
+blend 0.40 (E107) and at 0.50; six members scored 0.940 at 0.50 (E111) and at
+E116's per-finding vector averaging 0.43. **Member count moved the board +0.002
+twice; blend weight moved it 0.000 twice.** Both +0.002 results sit inside the
+±0.003 reseed floor (E092), so **the shipped config is back to five members and
+the scalar 0.50** per E111's and E116's own pre-registered rules. The 0.940 stays
+banked regardless — the board keeps a team's best. **A reseed control on the
+sixth member is the one experiment that would settle it, and it is GPU-blocked.**
 Leaderboard top **0.957**. **3,769 teams.** Final submission **2026-10-22**.
 
 **Rank 798 of 3,769, measured 2026-09-15 07:10 UTC** — **760 of 3,723 the day
