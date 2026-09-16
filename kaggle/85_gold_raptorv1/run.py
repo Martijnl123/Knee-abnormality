@@ -88,7 +88,7 @@ DECODE_AHEAD        = 32
 EVAL_SPLIT          = "gold"
 GOLD_EXPECTED       = 58
 V1_MEMBERS          = 6
-V1_BLEND_W          = 0.5
+V1_BLEND_W          = (0.406, 0.348, 0.5, 0.455, 0.456, 0.388, 0.38, 0.408, 0.403, 0.487, 0.426, 0.452)
 V1_BATCH_STUDIES    = 4
 V1_SLICE_SUBSAMPLE  = None
 V1_INPUT_NORM       = False
@@ -1215,34 +1215,23 @@ def main():
     ranks = np.tensordot(weights, np.stack([rankpct(np.clip(p, 0, 1)) for p in probs]), axes=(0, 0))
     ranks[~np.isfinite(ranks)] = 0.5
     if v1_probs is not None:
-        # V1_BLEND_W IS THE ONE FITTED NUMBER IN THIS PIPELINE, and E107 says so
-        # rather than dressing it up. Six schemes in this log were refused for
-        # choosing a weight on the 58 gold studies. What changed is not the
-        # evidence -- it is the COST OF BEING WRONG. The board keeps a team's
-        # best submission, 0.938 is banked, and slots are unused, so testing a
-        # weight can no longer lose anything. That was never true before.
+        # V1_BLEND_W: ONE WEIGHT PER FINDING (E116), and the manifest explains
+        # where each number comes from. What matters here is the invariant:
+        # nothing in this file fits it, and the vector is broadcast over
+        # COLUMNS. A reshape(-1, 1) instead would weight STUDIES rather than
+        # findings, run without error, and produce a submission about nothing.
         #
-        # What gold-58 supports is the DIRECTION, not the magnitude: bootstrapped
-        # over 4,000 resamples the optimum has median 0.35 and a 95% interval of
-        # [0.05, 0.55], with P(optimum <= 0.50) = 0.972. The 0.30-vs-0.50
-        # difference itself is +0.0022 with CI [-0.0044, +0.0092] -- not
-        # separated. So 0.50 sits at the top edge of the plausible range and
-        # moving down is supported; moving to any PARTICULAR value is not.
-        #
-        # 0.40 rather than gold's own argmax of 0.30, for two reasons that both
-        # pull the same way. The sweep used the five-fold OUT-OF-FOLD v1 at 0.8980
-        # gold, while the member actually shipped is the FULL-FIT five at 0.926
-        # board against the fold ensemble's 0.923 -- a stronger member wants more
-        # weight, not less. And weighting the two arms by their measured BOARD
-        # scores (0.932 and 0.926), the only instrument here that has never
-        # misled, lands on 0.497. Two signals disagree; 0.40 is between them and
-        # nearer the bootstrap median than the shipped value is.
-        #
-        # Both sides are re-ranked first. The left is a WEIGHTED MEAN of rank
-        # columns and the right a plain mean of them; neither is uniform on
-        # (0,1), and averaging them raw would hand the flatter one the ordering.
+        # History, because the scalar it replaced is worth remembering: E107
+        # submitted a uniform 0.40 against 0.50 and the board returned 0.938
+        # both times. So a FLAT shift toward the CoAtNet half does nothing, and
+        # this vector's mean of 0.43 is therefore not what any board movement
+        # would be measuring -- the per-finding structure is.
         coat_r, v1_r = rankpct(ranks), rankpct(v1_probs)
-        ranks = (1.0 - V1_BLEND_W) * coat_r + V1_BLEND_W * v1_r
+        # V1_BLEND_W is a scalar or one weight per finding, broadcast over columns.
+        _w = np.asarray(V1_BLEND_W, dtype=np.float64).reshape(1, -1)
+        if _w.size not in (1, len(LAB)):
+            raise RuntimeError(f"V1_BLEND_W has {_w.size} entries, expected 1 or {len(LAB)}")
+        ranks = (1.0 - _w) * coat_r + _w * v1_r
         agree = float(np.mean([np.corrcoef(coat_r[:, k], v1_r[:, k])[0, 1]
                                for k in range(len(LAB))])) if len(ids) > 2 else float("nan")
         # The weight is INTERPOLATED, not spelled out. This line read a literal
@@ -1251,8 +1240,9 @@ def main():
         # trainer's gold message had two days ago: a correct number reported
         # under the wrong description. A reader would have concluded the change
         # never took effect.
-        print(f"[blend] + v1 arm at {1 - V1_BLEND_W:.2f}/{V1_BLEND_W:.2f} "
-              f"(coat/v1) | mean cross-architecture rank "
+        print(f"[blend] + v1 arm at {1 - _w.mean():.2f}/{_w.mean():.2f} "
+              f"(coat/v1, mean of {_w.size} weight{'s' if _w.size > 1 else ''}) "
+              f"| mean cross-architecture rank "
               f"correlation {agree:.3f} (E101 measured 0.793 on gold; CoAtNet's "
               f"own four arms sit at 0.905-0.986)", flush=True)
 

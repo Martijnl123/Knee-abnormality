@@ -2319,14 +2319,29 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 6,
-            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
-            # 0.938 — the same three decimals as 0.50, on a board that resolves
-            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
-            # no evidence either way and restores the default, because 0.50
-            # needs no justification and 0.40 is a number fitted on 58 studies.
-            # Keeping a fitted parameter that demonstrated nothing would be the
-            # seventh refusal quietly not happening.
-            "V1_BLEND_W": 0.50,
+            # E116: ONE WEIGHT PER FINDING, derived WITHOUT touching gold-58 and
+            # WITHOUT touching CoAtNet's predictions — which is what makes it
+            # legal after E113 found those predictions are in-sample on the 4,349.
+            #
+            # The rule: weight our arm in proportion to how well it learned its
+            # OWN supervision, measured as its honest out-of-fold AUC against its
+            # own training labels on the 4,349 non-gold studies. Where our model
+            # failed to learn what it was taught it is contributing noise to that
+            # column, and MCL is the worst at 0.778.
+            #
+            # ONE-SIDED, and that is an argument rather than a knob: fitting your
+            # own labels well is NOT evidence you beat the other arm, so nothing
+            # rises above 0.50. The reference is the best-learned column, which is
+            # a datum in the data, not a tuned constant.
+            #
+            # E107 ALREADY RAN THE CONTROL. It submitted a uniform 0.40 against
+            # 0.50 and the board returned 0.938 both times, so a flat shift toward
+            # CoAtNet is known to do nothing. The mean weight here is 0.43, which
+            # means any board movement is attributable to the PER-FINDING
+            # STRUCTURE and not to the overall shift. That control was run for a
+            # different question and happens to be exactly the one this needs.
+            "V1_BLEND_W": (0.406, 0.348, 0.500, 0.455, 0.456, 0.388,
+                           0.380, 0.408, 0.403, 0.487, 0.426, 0.452),
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,
@@ -2386,14 +2401,29 @@ EXTRAS = [
             # a mounted kernel supplies its last SAVED output, frozen at the
             # 3-study visible run).
             "V1_MEMBERS": 6,
-            # REVERTED TO 0.50 BY E107's OWN RULE. 0.40 was submitted and scored
-            # 0.938 — the same three decimals as 0.50, on a board that resolves
-            # to 0.001. The pre-registration said the 0.936-0.940 bracket means
-            # no evidence either way and restores the default, because 0.50
-            # needs no justification and 0.40 is a number fitted on 58 studies.
-            # Keeping a fitted parameter that demonstrated nothing would be the
-            # seventh refusal quietly not happening.
-            "V1_BLEND_W": 0.50,
+            # E116: ONE WEIGHT PER FINDING, derived WITHOUT touching gold-58 and
+            # WITHOUT touching CoAtNet's predictions — which is what makes it
+            # legal after E113 found those predictions are in-sample on the 4,349.
+            #
+            # The rule: weight our arm in proportion to how well it learned its
+            # OWN supervision, measured as its honest out-of-fold AUC against its
+            # own training labels on the 4,349 non-gold studies. Where our model
+            # failed to learn what it was taught it is contributing noise to that
+            # column, and MCL is the worst at 0.778.
+            #
+            # ONE-SIDED, and that is an argument rather than a knob: fitting your
+            # own labels well is NOT evidence you beat the other arm, so nothing
+            # rises above 0.50. The reference is the best-learned column, which is
+            # a datum in the data, not a tuned constant.
+            #
+            # E107 ALREADY RAN THE CONTROL. It submitted a uniform 0.40 against
+            # 0.50 and the board returned 0.938 both times, so a flat shift toward
+            # CoAtNet is known to do nothing. The mean weight here is 0.43, which
+            # means any board movement is attributable to the PER-FINDING
+            # STRUCTURE and not to the overall shift. That control was run for a
+            # different question and happens to be exactly the one this needs.
+            "V1_BLEND_W": (0.406, 0.348, 0.500, 0.455, 0.456, 0.388,
+                           0.380, 0.408, 0.403, 0.487, 0.426, 0.452),
             "V1_BATCH_STUDIES": V1.infer_batch,
             "V1_SLICE_SUBSAMPLE": None,
             "V1_INPUT_NORM": False,

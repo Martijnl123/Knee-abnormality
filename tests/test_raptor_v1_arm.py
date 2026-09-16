@@ -152,7 +152,15 @@ def test_the_blend_weight_is_declared_and_inside_what_gold_supports():
     specific number is exactly what gold-58 could not separate."""
     for slug in V1_SLUGS:
         w = _kernel(slug).constants["V1_BLEND_W"]
-        assert 0.05 <= w <= 0.55, f"{slug} weight {w} is outside the bootstrap interval"
+        # E116 made this a per-finding vector. Every entry must still sit inside
+        # the interval gold-58 supports, and the MEAN must too -- a vector whose
+        # entries individually pass but whose mean drifts out would be a scalar
+        # change wearing a per-finding disguise.
+        ws = [w] if isinstance(w, (int, float)) else list(w)
+        assert len(ws) in (1, 12), f"{slug}: {len(ws)} weights, expected 1 or 12"
+        for x in ws:
+            assert 0.05 <= x <= 0.55, f"{slug} weight {x} is outside the interval"
+        assert 0.05 <= sum(ws) / len(ws) <= 0.55, f"{slug} mean weight drifted"
     assert _kernel("knee-infer-raptorv1").constants["V1_BLEND_W"] == \
            _kernel("knee-gold-raptorv1").constants["V1_BLEND_W"], \
         "the gold check must run the weight the submission ships"
@@ -164,9 +172,12 @@ def test_the_blend_re_ranks_both_sides_before_mixing():
     ordering to whichever happens to be flatter."""
     src = BLEND.read_text()
     i = src.index("if v1_probs is not None:")
-    block = src[i:i + 2200]
+    block = src[i:i + 3000]
     assert "coat_r, v1_r = rankpct(ranks), rankpct(v1_probs)" in block
-    assert "(1.0 - V1_BLEND_W) * coat_r + V1_BLEND_W * v1_r" in block
+    assert "(1.0 - _w) * coat_r + _w * v1_r" in block
+    # The vector must be broadcast over COLUMNS, not rows: reshape(1, -1). A
+    # (-1, 1) would silently weight studies instead of findings and still run.
+    assert "reshape(1, -1)" in block
 
 
 # --------------------------------------------------------------------------- #

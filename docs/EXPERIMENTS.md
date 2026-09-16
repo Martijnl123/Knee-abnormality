@@ -7188,3 +7188,68 @@ then a retrain of our half (GPU, waits on the quota reset).
   honest ceiling**, which is the review's own hedge and E114's finding pointing
   the same way. Of the four weak columns, **Fracture and Lateral OA have more
   visible headroom than synovitis does.**
+
+
+### E116 — per-finding weights, derived without gold-58 and without CoAtNet: the route E106 closed, reopened by E113
+- **date**: 2026-09-16. CPU only to derive; one submission pending a click.
+
+**WHY THIS IS NOT E106 AGAIN.** E106 fitted per-finding weights on the 4,349
+against report labels and they **lost** on held-out gold. E113 then found the
+cause: **CoAtNet's predictions on those 4,349 studies are in-sample**, so the fit
+was reading memorisation. **This derivation never touches CoAtNet's predictions
+and never touches gold-58.**
+
+**THE RULE, and every input to it is leakage-free.** Weight our own arm per
+finding in proportion to **how well it learned its own supervision** — its honest
+out-of-fold AUC against its own training labels, on the 4,349 non-gold studies:
+
+```
+MCL 0.778   PF OA 0.804   Lateral OA 0.810   Synovitis 0.823   ACL 0.825
+Effusion 0.826   Contusion 0.841   Fracture 0.862   Lat Men 0.864
+Medial OA 0.865   Baker's 0.889   Medial Meniscus 0.900
+```
+
+  **MCL is the worst-learned column.** Where our model failed to learn what it was
+  taught, it is contributing noise — and E105's oracle independently found MCL is
+  where the uniform blend loses most (**−0.032** on that column alone).
+
+**ONE-SIDED, and that is an argument rather than a knob.** Fitting your own labels
+well is **not** evidence you beat the other arm, so nothing rises above 0.50 —
+only reductions. The reference is the best-learned column, a datum in the data
+rather than a tuned constant. **No free parameter is introduced.**
+
+**HELD-OUT TEST on the 58, which the derivation never saw:**
+
+| | gold macro |
+|---|---:|
+| uniform 0.50 (shipped, board 0.940) | 0.9254 |
+| **per-finding, one-sided** | **0.9277** |
+| difference | **+0.0023**, CI [−0.0012, +0.0063], **P(better) = 0.897** |
+| **MCL alone** | **0.950 → 0.973, +0.023** |
+
+  **The mechanism is validated on its target column**: a rule built from
+  leakage-free data picked MCL out of twelve and recovered **72%** of the loss
+  E105's oracle identified there.
+
+**AND E107 ALREADY RAN THE CONTROL, for a different question.** It submitted a
+**uniform 0.40 against 0.50** and the board returned **0.938 both times** — so a
+flat shift toward the CoAtNet half does nothing measurable. This vector's mean is
+**0.43**. **Any board movement is therefore attributable to the per-finding
+structure and not to the overall shift**, and that control cost nothing because it
+was already spent.
+
+**PRE-REGISTERED against the standing 0.940**, board unseen:
+
+| board | reading |
+|---|---|
+| **≥ 0.943** | the structure pays; per-finding weighting is live and E106's closure was a leakage artefact |
+| 0.938–0.942 | inside the floor — revert to the scalar 0.50, which needs no justification |
+| **≤ 0.937** | it dilutes; the route closes on the only clean instrument |
+
+- **E107's boundary forbids converting the +0.0023.** That factor applies to
+  *adding a member*, not to re-mixing, so no gold→board arithmetic is available
+  here. **The board is the only judge and it costs one click.**
+- **why it is worth the click at +0.0023 when E112's +0.0024 was not**: E112's
+  validation ran on in-sample CoAtNet predictions and is void (E113). This one is
+  leakage-free, has a mechanism validated on a named column, P(better) = 0.897
+  against E112's untrustworthy number, **and a control that has already run.**
