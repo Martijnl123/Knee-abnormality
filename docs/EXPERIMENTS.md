@@ -6282,7 +6282,7 @@ answers** on the 58 — an upper bound no honest scheme can reach:
   already on disk. **Three routes closed, one ceiling established, zero GPU.**
 
 
-### E106 — a blend weight fitted somewhere the test set is not: the proxy cannot arbitrate between models
+### E106 — a blend weight fitted somewhere the test set is not: the proxy cannot arbitrate between models (MECHANISM CORRECTED BY E113 — leakage, not label noise)
 - **date**: 2026-09-14, written **before** the run. `knee-trainall-raptor`, ~5.7
   GPU-h, **no submission**. Quota reopened; ~30 h available.
 
@@ -6535,7 +6535,7 @@ which would have printed 0.941. It printed 0.938.
   been argued six times is now answered on the only instrument that counts.
 
 
-### E108 — E106 was over-generalised; the span question reopened and closed 0 for 3
+### E108 — E106 was over-generalised; the span question reopened and closed 0 for 3 (CONCLUSION WITHDRAWN BY E113 — the arbiter was in-sample for these arms)
 - **date**: 2026-09-14. The measurement below is CPU-only on files already on
   disk. The run it justifies (`knee-trainall-span04`, ~6.6 GPU-h) is **pushed and
   pending**; its acceptance rules are fixed here before it lands.
@@ -6908,7 +6908,7 @@ weekly quota is spent. **Recorded as the open question it is.**
   them.
 
 
-### E112 — upstream's arm weights survive their first test here, and the reverse arm is confirmed near-worthless
+### E112 — upstream's arm weights survive their first test here, and the reverse arm is confirmed near-worthless (VALIDATION VOID PER E113 — fitted on in-sample CoAtNet predictions)
 - **date**: 2026-09-15, written **before** the fit. CPU only, **no GPU, no
   submission**, on files already on disk.
 
@@ -6996,3 +6996,68 @@ two independent instruments now say so.**
   has never seen, has now been checked against 4,349 of its own studies and
   held. **Inherited and measured are different states even when the number is
   the same.**
+
+
+### E113 — LEAKAGE, not label noise: the CoAtNet arm is in-sample on the 4,349, and gold-58 is suspect too
+- **date**: 2026-09-16. CPU only, files already on disk. **Prompted by an outside
+  research review; verified here before acting on it.**
+
+**THE CLAIM.** The CC0 CoAtNet checkpoints were trained by their authors on the
+**full 4,407-study training set**, so their predictions on the 4,349 non-gold
+studies are **in-sample** and cannot be treated as out-of-fold. Three entries in
+this log — E106, E108, E112 — use exactly those predictions as an arbiter.
+
+**THE TEST, AND IT DOES NOT NEED NEW DATA.** Our v1 arm is honestly out-of-fold
+on *both* study sets. CoAtNet is in-sample on the 4,349 and (per upstream) held
+out of the 58. **If leakage is real, the CoAtNet-over-v1 gap must inflate on the
+4,349 and shrink toward the board, where nothing is in-sample.**
+
+| study set | CoAtNet's status there | CoAtNet | our v1 | **gap** |
+|---|---|---:|---:|---:|
+| 4,349 non-gold, report labels | **in-sample** | 0.9160 | 0.8404 | **0.0756** |
+| 58 gold, expert labels | held out | 0.9223 | 0.8980 | **0.0243** |
+| **the board**, each half alone | **nothing in-sample** | 0.9320 | 0.9260 | **0.0060** |
+
+  **A clean monotonic ladder, 12.6× from board to fit set.** The prediction holds
+  exactly. **This is leakage, and it is measured rather than argued.**
+
+**AND THE MIDDLE ROW IS THE PART NOBODY FLAGGED.** Gold-58 puts the two halves
+**0.0243** apart; the board puts them **0.0060** apart — still **4×**. Published
+checkpoints carry a `gold_auc` field, which means **upstream had our 58 studies
+and may have selected checkpoints on them.** Gold-58 is therefore not clean for
+CoAtNet either, only cleaner.
+
+**WHAT THIS REVISES, and it is a lot.**
+
+- **E106's mechanism was half right.** It concluded the proxy "rewards a model for
+  agreeing with the labels it was trained on". The sharper cause is that CoAtNet
+  **memorised those studies**. Same direction, but the correct name matters: a
+  relabelling fixes label noise and **cannot fix in-sample leakage**.
+- **E108's span result is confounded and its conclusion is withdrawn.** Both
+  variants share a memorised checkpoint, so narrowing the span may have been
+  disrupting *memorisation* rather than losing signal. That is a live alternative
+  explanation for why gold-58 said +0.0055 and the 4,349 said −0.0068 — **the two
+  instruments differ in exactly the way leakage predicts.** E108's "0 for 3,
+  closes for good" is downgraded to **unresolved**.
+- **E112's weight fit ran on in-sample predictions.** Its null stands (it changed
+  nothing) but its *validation* is void.
+- **E048's comparability rule, E098's gap table and E101's blend readings all
+  used gold-58 gaps** that this entry shows are ~4× the board's. **Every "member
+  gap" number in this log involving CoAtNet is inflated.**
+
+**WHAT SURVIVES.** Anything measured on the **board**, and anything comparing
+**our own arms** to each other on honest out-of-fold predictions. The v1 lineage
+is clean throughout — it is CoAtNet that is contaminated, and only where it was
+trained.
+
+- **the rule going forward**: **for any comparison involving the CoAtNet arm, the
+  board is the only clean instrument.** Not gold-58, not the 4,349.
+- **a second review claim, checked and NOT applicable.** The review suggested our
+  three CoAtNet checkpoints are all fed MaxSpan's recipe. **E088 fixed that.**
+  `native384-v8` runs 44 slices / 42 windows / span 0.06–0.94 and
+  `native384dense-v10` runs native 384 rather than 336 upsampled — three distinct
+  geometries across four arms. The review inferred it from our brief saying
+  "~62 windows", which described v5 only. **Our brief was imprecise; the code was
+  not.**
+- **cost**: one arithmetic check on files already present. **The most consequential
+  entry in two weeks, and it cost nothing.**

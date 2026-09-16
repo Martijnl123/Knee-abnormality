@@ -47,6 +47,8 @@ from that consensus. **No model-selection decision here may use report labels as
 the judge ACROSS ARCHITECTURES, at any number of parameters.** Training on them
 remains correct and remains this project's largest single gain (E044, +0.1067).
 
+**SUPERSEDED BY E113 (2026-09-16): the narrowing below rests on an arbiter that is IN-SAMPLE for the CoAtNet arm, so its +0.800 may be two contaminated instruments agreeing. For any comparison involving CoAtNet, the BOARD is the only clean instrument.**
+
 **NARROWED 2026-09-14 (E108), and the first version of this rule was too broad.**
 It said "no model-selection decision", full stop, which over-generalises its own
 evidence. E106's mechanism is that the proxy rewards a model for agreeing with

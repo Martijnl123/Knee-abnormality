@@ -68,6 +68,33 @@ brackets is the experiment.
 
 ---
 
+## 3b. READ THIS FIRST — E113 changed what §4 says (2026-09-16)
+
+An outside research review pointed out, and **our own numbers confirm**, that the
+CC0 CoAtNet checkpoints were trained on the **full** 4,407-study training set. So
+their predictions on the 4,349 "non-gold" studies are **in-sample**, not
+out-of-fold. The test needs no new data — our v1 arm is honestly out-of-fold on
+both sets, so the gap between the halves should inflate where CoAtNet is
+in-sample:
+
+| study set | CoAtNet status | gap over our v1 |
+|---|---|---:|
+| 4,349 non-gold | **in-sample** | **0.0756** |
+| 58 gold | held out | **0.0243** |
+| **the board** | nothing in-sample | **0.0060** |
+
+**12.6× from board to fit set.** And the middle row matters just as much:
+published checkpoints carry a `gold_auc` field, so upstream had our 58 studies
+and may have selected on them — gold-58 is not clean for CoAtNet either, only
+cleaner.
+
+**Working rule: for any comparison involving the CoAtNet arm, the board is the
+only clean instrument.** E108's span conclusion is withdrawn, E112's validation
+is void, and every "member gap" number in the log involving CoAtNet is inflated.
+The v1 lineage is clean throughout.
+
+---
+
 ## 4. The three instruments, and what each can and cannot do
 
 This is the part worth internalising. Most of our wasted effort came from
