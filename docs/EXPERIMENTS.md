@@ -7061,3 +7061,62 @@ trained.
   not.**
 - **cost**: one arithmetic check on files already present. **The most consequential
   entry in two weeks, and it cost nothing.**
+
+
+### E114 — the effusion→synovitis surrogate: the mechanism is real and the model already has it
+- **date**: 2026-09-16. CPU only, **no GPU, no submission**. From the outside
+  research review's recommendation 3.
+
+**THE PROPOSAL.** Without contrast, readers score synovitis through surrogates;
+effusion-synovitis is the recommended stand-in and carries far better inter-reader
+reliability than Hoffa-synovitis (reported 1.00 against 0.21). Our effusion column
+scores 0.988 and synovitis 0.820. So: rank-mix effusion into the synovitis column.
+
+**THE MECHANISM IS PRESENT IN THE EXPERT LABELS — checked first, and this part is
+contamination-free because it uses labels only, no model.**
+
+| | |
+|---|---|
+| phi correlation, effusion × synovitis | **+0.403** |
+| P(synovitis \| effusion) | **0.629** |
+| P(synovitis \| no effusion) | **0.217** |
+
+  **A 2.9× lift.** The clinical reasoning is sound and the 58 expert studies
+  confirm it.
+
+**AND THE MIX IS MONOTONICALLY NEGATIVE ANYWAY.**
+
+| w_effusion | synovitis | MACRO | delta |
+|---:|---:|---:|---:|
+| 0.00 (shipped) | 0.8196 | 0.9254 | — |
+| 0.10 | 0.8160 | 0.9251 | −0.0003 |
+| 0.30 | 0.8088 | 0.9245 | −0.0009 |
+| **0.50** (the unfitted weight) | 0.7945 | 0.9233 | **−0.0021** |
+| 1.00 | 0.7611 | 0.9205 | −0.0049 |
+
+  **Every step down, from the first.** No interior optimum, so this is not a
+  "wrong weight" result — the direction itself is wrong.
+
+**THE FINDING, and it generalises past this competition.** The surrogate
+relationship is real *in the labels* and the model **has already extracted it**.
+Our synovitis column at 0.820 encodes whatever effusion implies about synovitis,
+because the same network sees both and predicts both from the same pixels.
+Injecting the effusion ranking adds **no information** and displaces
+synovitis-specific signal.
+
+  **A real clinical correlation is not a free feature when the model already sees
+  both sides of it.** The surrogate is advice for a human reader working without
+  contrast; a model trained on both columns jointly does not need to be told.
+
+- **so synovitis' headroom is probably smaller than 0.809 suggests**, which the
+  review itself flagged. If the ceiling is set by what is visible without
+  contrast, and the labels themselves lean on effusion, then 0.82 may be near the
+  honest limit of this task rather than a deficiency of ours.
+- **caveat from E113**: this blend contains the CoAtNet arm, so gold-58 is not a
+  fully clean instrument here. It does not change the reading — the effect is
+  monotonic and reaches −0.0049, and no board submission is justified for a
+  direction that is negative from the first step offline.
+- **cost**: zero. One of three review recommendations resolved for nothing; the
+  first was already implemented (E088, per E113) and the remaining one — rubric
+  aligned ordinal labels — is the real lever and needs GPU this project does not
+  have until the quota resets.
