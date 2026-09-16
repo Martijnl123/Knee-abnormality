@@ -7253,3 +7253,12 @@ was already spent.
   validation ran on in-sample CoAtNet predictions and is void (E113). This one is
   leakage-free, has a mechanism validated on a named column, P(better) = 0.897
   against E112's untrustworthy number, **and a control that has already run.**
+- **E111'S REVERT IS DEFERRED, NOT DROPPED — and the reason is the test itself.**
+  E111 pre-registered *revert to five v1 members* and 0.940 landed in that
+  bracket, so the revert is owed. It has **not** been applied, and applying it
+  now would have made this submission a **two-variable change** against the
+  standing 0.940 — sixth member removed *and* per-finding weights added — with no
+  way to read which moved the board. The manifest therefore still declares
+  **`V1_MEMBERS: 6`**, and this run differs from the banked 0.940 by **exactly one
+  thing**. **The revert is owed the moment E116 resolves, whichever bracket it
+  lands in**, and if the reseed control is ever run it settles E111 directly.
