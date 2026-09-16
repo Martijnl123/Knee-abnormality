@@ -7120,3 +7120,71 @@ synovitis-specific signal.
   first was already implemented (E088, per E113) and the remaining one — rubric
   aligned ordinal labels — is the real lever and needs GPU this project does not
   have until the quota resets.
+
+
+### E115 — synovitis is a LABEL CEILING, measured; and a per-column result E089's macro comparison hid
+- **date**: 2026-09-16. CPU only, **no GPU, no submission**, files already on disk.
+
+**THE DIAGNOSIS: OUR MODEL IS NOT FAILING TO SEE SYNOVITIS.** Score the *training
+labels themselves* against the 58 expert studies, alongside the models trained on
+them:
+
+| finding | **labels vs expert** | our v1 | CoAtNet | reading |
+|---|---:|---:|---:|---|
+| **Synovitis** | **0.790** — worst of twelve | **0.779** | 0.809 | **at the ceiling** |
+| Fracture | 0.793 | **0.885** | 0.919 | model **exceeds** labels by +0.09 |
+| Medial OA | 0.932 | 0.980 | 0.973 | exceeds |
+| Effusion | 0.877 | 0.929 | 0.984 | exceeds |
+| MACRO | 0.893 | 0.898 | 0.922 | |
+
+  **Synovitis has the worst labels of any column, and our model sits 0.011 below
+  them.** It is reproducing its supervision faithfully. **You cannot train past
+  your labels**, and no architecture, resolution or ensembling change addresses
+  this.
+
+**FRACTURE IS THE CONTROL THAT PROVES IT.** Its labels are just as bad — 0.793 —
+and the model beats them by **+0.09**. So bad labels are not automatically a
+ceiling: where the pixels are unambiguous (a cortical break) the model recovers
+signal the reports never carried. **Synovitis is limited on both sides at once:
+ambiguous in the reports *and* ambiguous in the pixels without contrast.** E114
+already showed its one clinical surrogate is fully absorbed.
+
+**AND NO PUBLIC LABEL SET FIXES IT.** Scored on the 58, per column:
+
+| synovitis labels | AUC |
+|---|---:|
+| **`stevenleehans` (what we train on)** | **0.815** |
+| `pilkwang` | 0.694 |
+| `lixin73 sol56` | 0.676 |
+
+  Paired bootstrap, incumbent vs `pilkwang`: **−0.121, CI [−0.208, −0.039]** —
+  **separated in the incumbent's favour.** We already have the best synovitis
+  labels in the field. **There is nothing to swap to.**
+
+**THE ONE THING E089's MACRO COMPARISON HID.** E089 compared label sets on the
+macro and concluded none beats the incumbent. True on the macro — and it conceals
+that **`pilkwang` is better on Fracture: 0.871 against 0.791, +0.080, CI
+[+0.001, +0.178]**, the only column where a rival set separates.
+
+- **stated as suggestive, not established.** That is **one column out of twelve
+  tested**, and a CI that clears zero by 0.001. With twelve comparisons, one
+  scraping past p=0.05 is what chance produces — after any multiple-comparison
+  correction it does not survive. **It is a lead, not a result**, and it would
+  need its own pre-registered test on a column chosen in advance.
+- **but the methodological point stands regardless**: comparing label sets on a
+  macro average can hide a large per-column difference in both directions, and
+  E089 closed the label route on exactly such an average.
+
+**WHAT WOULD ACTUALLY FIX SYNOVITIS.** Not a swap and not a model change —
+**labels nobody currently has.** The reports are being read for a binary
+"synovitis" mention, when what a radiologist without contrast actually records is
+**surrogates and severity**: effusion-synovitis versus Hoffa-synovitis, synovial
+thickening, trace/small/moderate/large. Extracting *those* and mapping them to
+the host's rubric is the open lever — an LLM pass over 4,407 reports (no GPU),
+then a retrain of our half (GPU, waits on the quota reset).
+
+- **and temper the expectation.** The labels' own 0.790 partly reflects that
+  non-contrast synovitis is genuinely ambiguous. **0.82 may be near this task's
+  honest ceiling**, which is the review's own hedge and E114's finding pointing
+  the same way. Of the four weak columns, **Fracture and Lateral OA have more
+  visible headroom than synovitis does.**
