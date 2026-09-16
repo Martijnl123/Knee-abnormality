@@ -6817,7 +6817,7 @@ first**, fixed before the comparison ran:
   cost four minutes.**
 
 
-### E111 — a sixth v1 member, shipped without an offline number because there cannot be one
+### E111 — a sixth v1 member: 0.940, the best score yet, and inside the floor by its own rule
 - **date**: 2026-09-15. `knee-train-v1pubfull-r50`, **~3.5 GPU-h**, all 24 epochs,
   export taken at epoch 20 as configured. One submission pending a human click.
 
@@ -6872,6 +6872,34 @@ was rejected in its favour.
   same-lineage members at **+0.001**, and a depth change is more than a reseed
   and less than a new architecture family. **This is a cheap shot with a
   mechanism, not a plan.**
+
+**RESULT (2026-09-16). BOARD 0.940, from 0.938. Rank 688 / 3,839, from 798.**
+The stub run verified six distinct weight fingerprints — the resnet50's at
+**9.9743** against the five resnet34s' −3.9 to −9.1, a visibly different scale,
+which is what a different architecture should look like and is the guard
+discriminating weights rather than counting files.
+
+**+0.002 LANDS IN THE MIDDLE BRACKET, AND THE RULE SAYS REVERT.** E111
+pre-registered *0.936–0.940 → inside the ±0.003 floor (E092) → revert to five,
+which needs no justification*. **0.940 is the top edge of that bracket.** It is
+also the best score this project has recorded, and those two facts are both true:
+
+- **the banked score does not depend on the code.** The leaderboard keeps a
+  team's best, so 0.940 stands whatever the manifest says next. Reverting the
+  sixth member costs nothing on the board.
+- **but +0.002 against a ±0.003 reseed floor is not a measurement**, and E092
+  established that floor by changing nothing but the RNG seed and watching 0.926
+  become 0.923/0.921. **A sixth member that moved the board by less than a reseed
+  does has not been shown to do anything.**
+- **so the rule is honoured: the manifest reverts to five.** Keeping it would be
+  banking a number the instrument cannot resolve, which is the failure E083 cost
+  a board point to and E107 was reverted for. **E064's +0.001 prior was right to
+  within the floor's width.**
+
+**WHAT WOULD SETTLE IT, and why it is not being run.** A reseed control — the
+same six-member blend with a different seed on the r50 — would separate +0.002 of
+member from +0.002 of draw, exactly as E092 did. It costs ~3.5 GPU-h and the
+weekly quota is spent. **Recorded as the open question it is.**
 - **a test was loosened, and deliberately.** `test_the_member_count_is_declared_
   and_matches_the_trainers_mounted` asserted `== 5` and failed on a correct
   change. It now asserts the **invariant** — declared count equals trainers

@@ -11,8 +11,8 @@ priorities.
 
 | | |
 |---|---|
-| **Board** | **0.938** (submitted 2026-09-14 20:35) |
-| **Rank** | **798 of 3,769** — was 760 of 3,723 the day before, **same score** |
+| **Board** | **0.940** (submitted 2026-09-16, E111's six-member blend) |
+| **Rank** | **688 of 3,839** — was 798 of 3,769 at 0.938 |
 | Top of board | 0.957 |
 | Submissions used | 22 total; 5/day, and we rarely use them |
 | Final submission | 2026-10-22 |
