@@ -51,6 +51,18 @@ FINDINGS = ["ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA",
 PUBLISHED_ARM_WEIGHTS = {"maxspan-v5": 0.55, "native384dense-v10": 0.10,
                          "maxspan-v5-reverse": 0.15, "native384-v8": 0.20}
 
+# Our arm's honest out-of-fold AUC per finding on the 4,349 non-gold studies,
+# against its own training labels. A table of measurements, not of choices --
+# it is the sole input to `one_sided_weights` below. Published in E116 rounded
+# to three decimals, which is why reproducing the shipped vector from it lands
+# three of twelve columns one unit off in the last place.
+V1_OOF_AUC_E116 = {
+    "ACL": 0.825, "MCL": 0.778, "Medial Meniscus": 0.900,
+    "Lateral Meniscus": 0.864, "Medial OA": 0.865, "Lateral OA": 0.810,
+    "PF OA": 0.804, "Effusion": 0.826, "Synovitis": 0.823,
+    "Baker's": 0.889, "Contusion": 0.841, "Fracture": 0.862,
+}
+
 
 def auc(y, p):
     """Mann-Whitney AUC with average ranks for ties.
@@ -106,6 +118,49 @@ def fit_weights(truth, coat, v1, gold_mask=None):
         weights.append(w)
         table.append({"finding": finding, "auc_coat": a_c, "auc_v1": a_v, "w_v1": w})
     return np.array(weights), pd.DataFrame(table)
+
+
+# E116's SHIPPED RULE. `fit_weights` above is E106's, and E113 established why it
+# cannot be used: `auc(truth, coat)` scores CoAtNet against report labels on the
+# 4,349, and CoAtNet was TRAINED on those studies, so that term reads
+# memorisation rather than skill. Any weight vector derived from it is the
+# E106 failure again. It is kept because E106's entry refers to it, NOT because
+# it is live -- do not paste its output into the manifest.
+#
+# The rule that ships touches CoAtNet nowhere. It weights our own arm per finding
+# by how well that arm learned ITS OWN supervision -- honest out-of-fold AUC
+# against its own training labels -- and is one-sided: learning your own labels
+# well is not evidence you beat the other arm, so nothing rises above 0.50 and
+# only reductions happen. The reference is the best-learned column, a datum in
+# the data rather than a constant someone chose.
+#
+# RECONSTRUCTED AFTER THE FACT, and the reconstruction is checked rather than
+# asserted: `tests/test_per_finding_weights.py` re-derives the twelve numbers the
+# manifest ships from the AUC table published in E116 and pins them. Nine match
+# to the last digit; three land one unit off in the third decimal because the
+# published table is rounded to 3 dp and the original derivation ran on
+# full-precision AUCs. That is the expected signature of rounding, and it is
+# recorded here rather than smoothed over.
+
+
+def one_sided_weights(auc_v1):
+    """w_v1(f) = 0.5 * (AUC_v1(f) - 0.5) / (max_f AUC_v1(f) - 0.5).
+
+    `auc_v1` maps finding -> our arm's honest out-of-fold AUC. Returns weights in
+    FINDINGS order. No CoAtNet term, no gold-58, no free parameter.
+    """
+    missing = [f for f in FINDINGS if f not in auc_v1]
+    if missing:
+        raise ValueError(f"no out-of-fold AUC for {missing}")
+    a = np.array([float(auc_v1[f]) for f in FINDINGS])
+    if np.any(a <= 0.5):
+        raise ValueError(
+            "an arm at or below chance on "
+            f"{[FINDINGS[k] for k in np.flatnonzero(a <= 0.5)]} has no skill to "
+            "scale; the one-sided rule has nothing to say and a weight would be "
+            "invented rather than derived.")
+    best = a.max()
+    return 0.5 * (a - 0.5) / (best - 0.5)
 
 
 def blend(coat, v1, w_v1):

@@ -7262,3 +7262,37 @@ was already spent.
   **`V1_MEMBERS: 6`**, and this run differs from the banked 0.940 by **exactly one
   thing**. **The revert is owed the moment E116 resolves, whichever bracket it
   lands in**, and if the reseed control is ever run it settles E111 directly.
+
+**AUDITED BEFORE THE CLICK, because the claim and the code disagreed.** E116's
+central claim is that the weights touch CoAtNet nowhere. But the only
+weight-fitting function in the repo, `fit_weights` in
+`eda/per_finding_weights.py`, is **E106's two-sided rule** — it scores
+`auc(truth, coat)` on the 4,349, which E113 established is in-sample — and the
+E116 commit **did not touch that file at all**. So the shipped twelve constants
+were reproducible from nothing in the repository, and "this is not E106 again"
+rested on a sentence rather than on code.
+
+**The claim survives the audit.** Re-deriving from E116's published out-of-fold
+AUC table with `w(f) = 0.5·(AUC(f) − 0.5) / (max AUC − 0.5)` reproduces the
+shipped vector: **nine of twelve to the last digit**, and the other three
+(Effusion, Synovitis, Baker's) **one unit off in the third decimal** — the
+signature of a table published rounded to 3 dp against a derivation run at full
+precision, and not of a different formula. The largest unrounded disagreement is
+**0.00075**. CoAtNet's predictions do not enter, and neither does gold-58.
+
+**The gap is now closed in code rather than in prose.** `one_sided_weights` is in
+the repo with the AUC table beside it, and four tests pin it: the shipped vector
+must be re-derivable within 0.001, no weight may exceed 0.50 (one-sidedness is
+the argument standing in for a free parameter), an arm at chance must refuse
+rather than invent a weight, and **MCL must remain the smallest weight** — the
+point where this rule and E105's oracle independently agree. `fit_weights` is
+now labelled at the source as E106's, superseded, **not to be pasted into the
+manifest**; it was one copy-paste away from silently reintroducing the leak.
+
+- **a pre-existing test had to be repaired, and the reason matters.**
+  `test_the_formula_carries_no_threshold_floor_or_shrinkage_term` sliced the
+  source from `def fit_weights(` to `def blend(` and scanned for tuned-looking
+  literals. Inserting anything between those two functions widened its window and
+  made an ordinary measurement table look like a smuggled constant. It now slices
+  to the next top-level `def` and guards **both** rules, so it checks what it
+  means to check rather than what happened to sit next to it.

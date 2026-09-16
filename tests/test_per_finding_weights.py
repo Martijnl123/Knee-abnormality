@@ -100,11 +100,16 @@ def test_the_formula_carries_no_threshold_floor_or_shrinkage_term():
     """Read on the source. Each of those is a number chosen by someone who has
     seen the answer, and each would look like a reasonable safeguard."""
     src = (REPO_ROOT / "eda" / "per_finding_weights.py").read_text()
-    body = src[src.index("def fit_weights("):src.index("def blend(")]
-    code = "\n".join(line.split("#", 1)[0] for line in body.splitlines())
-    literals = {t for t in ("0.9", "0.8", "0.7", "0.6", "0.3", "0.2", "0.1", "0.05")
-                if t in code}
-    assert not literals, f"fit_weights carries tuned-looking constants {literals}"
+    for name in ("fit_weights", "one_sided_weights"):
+        # To the next top-level def, so that inserting a function between this
+        # one and whatever used to follow it cannot silently widen the window
+        # and make an unrelated table look like a tuned constant.
+        start = src.index(f"def {name}(")
+        end = src.index("\ndef ", start + 1)
+        code = "\n".join(line.split("#", 1)[0] for line in src[start:end].splitlines())
+        literals = {t for t in ("0.9", "0.8", "0.7", "0.6", "0.3", "0.2", "0.1",
+                                "0.05") if t in code}
+        assert not literals, f"{name} carries tuned-looking constants {literals}"
     assert "clip" not in code and "minimum" not in code and "maximum" not in code
 
 
@@ -224,3 +229,84 @@ def test_the_whole_pipeline_recovers_a_planted_per_finding_structure(tmp_path, c
     row = {line.split()[0]: line for line in out.splitlines() if line.strip().startswith(("MCL", "Baker"))}
     assert float(row["MCL"].split()[-1]) < 0.05, "the chance arm kept weight on MCL"
     assert float(row["Baker's"].split()[-1]) > 0.85, "the strong arm was not given Baker's"
+
+
+# --------------------------------------------------------------------------- #
+# E116's shipped vector
+# --------------------------------------------------------------------------- #
+def _shipped_vector():
+    """The twelve weights the manifest actually ships, read from the manifest."""
+    import src.pipeline as pipeline
+
+    found = {}
+    for kernel in pipeline.all_kernels():
+        cfg = getattr(kernel, "constants", None) or {}
+        if "V1_BLEND_W" in cfg and not isinstance(cfg["V1_BLEND_W"], float):
+            found[kernel.slug] = tuple(cfg["V1_BLEND_W"])
+    assert found, "no kernel ships a per-finding V1_BLEND_W"
+    assert len(set(found.values())) == 1, (
+        f"kernels disagree on the shipped weights: {found}. The gold kernel and "
+        "the submission must blend identically or the gold number is about a "
+        "different model than the one submitted.")
+    return next(iter(found.values()))
+
+
+def test_the_shipped_weights_are_reproduced_by_the_one_sided_rule():
+    """The manifest's twelve constants must be DERIVABLE, not just plausible.
+
+    E106 fitted weights against CoAtNet's in-sample predictions and lost; E113
+    found why. E116's claim is that its weights never touch CoAtNet. A claim like
+    that is worth exactly as much as the code that reproduces it, so this
+    re-derives the shipped vector from our arm's out-of-fold AUCs alone.
+
+    Tolerance is 0.001 because E116 publishes those AUCs rounded to three
+    decimals while the original derivation ran on full precision. Nine of the
+    twelve match exactly; the three that do not are off by one unit in the last
+    place, which is rounding and not a different formula.
+    """
+    derived = pfw.one_sided_weights(pfw.V1_OOF_AUC_E116)
+    shipped = np.array(_shipped_vector())
+
+    assert derived.shape == shipped.shape == (12,)
+    assert np.max(np.abs(derived - shipped)) <= 0.001 + 1e-12, (
+        "the shipped weights are not reproduced by the one-sided rule: "
+        f"{dict(zip(pfw.FINDINGS, np.round(derived - shipped, 4), strict=True))}")
+    # The manifest carries the derived vector rounded to three decimals, so
+    # the exact-match count is against the rounded form.
+    assert np.sum(np.abs(np.round(derived, 3) - shipped) > 1e-9) <= 3
+
+
+def test_the_shipped_weights_never_exceed_one_half():
+    """One-sidedness is the argument that replaces a free parameter.
+
+    If any weight rose above 0.50 the rule would be claiming our arm BEATS
+    CoAtNet on that finding, which learning its own labels well is no evidence
+    of. A vector that broke this would be a fit wearing the rule's clothes.
+    """
+    shipped = np.array(_shipped_vector())
+    assert np.all(shipped <= 0.5 + 1e-12), (
+        f"weights above 0.5: "
+        f"{[pfw.FINDINGS[k] for k in np.flatnonzero(shipped > 0.5)]}")
+    assert np.isclose(shipped.max(), 0.5), (
+        "no finding sits at the 0.50 reference, so the best-learned column is "
+        "not the reference and a constant has crept in")
+
+
+def test_an_arm_at_chance_refuses_rather_than_inventing_a_weight():
+    auc = dict(pfw.V1_OOF_AUC_E116)
+    auc["MCL"] = 0.5
+    with pytest.raises(ValueError, match="chance"):
+        pfw.one_sided_weights(auc)
+
+
+def test_the_rule_orders_weights_by_how_well_the_arm_learned_each_finding():
+    """MCL is worst-learned, so MCL must carry the smallest weight.
+
+    This is the mechanism E116 rests on: the rule found MCL independently of
+    E105's oracle, which had measured MCL as where uniform blending loses most.
+    If the ordering ever inverts, the two routes stop agreeing.
+    """
+    derived = pfw.one_sided_weights(pfw.V1_OOF_AUC_E116)
+    order = [pfw.FINDINGS[k] for k in np.argsort(derived)]
+    assert order[0] == "MCL"
+    assert order[-1] == "Medial Meniscus"
