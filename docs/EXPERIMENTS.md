@@ -7296,3 +7296,28 @@ manifest**; it was one copy-paste away from silently reintroducing the leak.
   made an ordinary measurement table look like a smuggled constant. It now slices
   to the next top-level `def` and guards **both** rules, so it checks what it
   means to check rather than what happened to sit next to it.
+
+**STUB RUN VERIFIED (version 6, submitted 21:33).** The three-study save run
+reports what the design requires and nothing it should not:
+
+```
+v1 members 6 | distinct weight fingerprints 6 | [9.9743, -7.2595, -7.4884,
+                                                 -6.3623, -3.9854, -9.1438]
+[blend] + v1 arm at 0.57/0.43 (coat/v1, mean of 12 weights)
+fallbacks 0/3 on every arm | wrote submission.csv rows=3
+```
+
+  The log line **interpolates** the weights rather than printing a hardcoded
+  ratio — the bug class that nearly shipped in E111 and again here, where a
+  constant said `0.5/0.5` while the arithmetic used something else. `mean of 12
+  weights` is the vector being live, and **0.43** is the mean E107's already-spent
+  control covers. The r50's fingerprint at **9.9743** against five resnet34s at
+  −3.9 to −9.1 is the guard discriminating weights rather than counting files.
+
+- **the version numbers are off by one and it is cosmetic.** `kaggle kernels
+  push` returned "version 5"; Kaggle labelled the submission "Version 6". The
+  live source was pulled back down and diffed against the generated kernel:
+  **identical but for the `# %% [code]` marker Kaggle prepends.** The number is
+  Kaggle's bookkeeping; the code is the audited code.
+- **the heaviest arm group projects 1.13 h over 1,300 studies**, so the four-arm
+  plus six-member blend has room under the 9 h cap.
