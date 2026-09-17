@@ -7377,3 +7377,91 @@ keeps a team's best — so **both reverts cost nothing and buy an honest manifes
   other **skips while a scalar ships** and enforces derivable-and-one-sided the
   day anyone reinstates a vector. A rule shelved by a measurement has to stay
   re-runnable, or "shelved by a measurement" is just a sentence.
+
+### E117 — the eleven untested CC0 checkpoints: the route is real, the arms are behind, and it does not pay
+- **date**: 2026-09-17. 0.56 GPU-h, no submission spent.
+
+**THE FINDING THAT STARTED IT.** The blend runs **three** distinct checkpoints.
+`dreaddevelopment` publishes **fourteen**, all CC0-1.0, all licence-cleared in
+E086 — and the other eleven appear in this log **only in an inventory table**.
+Catalogued once, never tested. Their stored `gold_auc`, read from the files:
+
+```
+coatnet_v4_full 0.9167   v4_full_swa 0.9150   v7_full_swa 0.9073
+v9_full 0.9031   coatnet384 0.9025   v6_full_swa 0.8997
+cnv2b336 0.8901   effv2l480 0.8716
+```
+
+  **`v4_full` at a stored 0.9167 outscores `native384-v8` at 0.9067, which the
+  blend already weights at 0.20.** Six sat inside E048's ±0.02 band and were
+  screened; `effv2l480`, 0.035 behind the weakest incumbent, was not.
+
+**THE CONTROLS VALIDATE THE RUN, which is the only reason the rest is readable.**
+
+| arm | measured | author | delta |
+|---|---:|---:|---:|
+| maxspan-v5 | 0.9198 | 0.9214 | −0.0016 |
+| native384dense-v10 | 0.9170 | 0.9174 | −0.0004 |
+| native384-v8 | 0.9116 | 0.9067 | +0.0049 |
+| cand-widefov-v6 | 0.9058 | 0.8997 | +0.0061 |
+| cand-widedense-v4 | 0.9058 | 0.9167 | −0.0109 |
+| cand-fullspan-v7 | 0.9034 | 0.9073 | −0.0039 |
+| cand-finespacing-v9 | 0.9006 | 0.9031 | −0.0025 |
+| cand-coatnet384 | 0.8885 | 0.9025 | −0.0140 |
+| cand-cnv2b336 | 0.8842 | 0.8901 | −0.0059 |
+
+  Zero fallbacks on all ten arms, 58/58 studies. **Every candidate lands below
+  every incumbent.**
+
+**THE PRE-REGISTERED RULE LOST, and it is reported as pre-registered.** New arms
+were to enter at 0.25, the mean published weight. That gives six weaker arms
+**60% of the total weight** and the ten-arm blend scores **0.9183 against the
+incumbent four's 0.9223 — −0.0040**, below even the best single arm at 0.9198.
+
+**AND THE ONLY OTHER RULE I CAN JUSTIFY ALSO LOSES.** Every new arm entering at
+**0.10**, the smallest published weight — one rule, no selection, applied to all
+six:
+
+| | gold macro |
+|---|---:|
+| incumbent four | 0.9223 |
+| + all six at 0.10 | **0.9214** |
+| difference | **−0.0009**, CI [−0.0068, +0.0048], P(better) **0.386** |
+
+**THE TRAP I AM NOT WALKING INTO.** Added **one at a time** at 0.10, all six
+*gain*: +0.0020 (v6), +0.0017 (cnv2b336), +0.0011, +0.0010, +0.0008, +0.0007.
+It is tempting and it is worthless. **Picking the best of six comparisons on the
+58 is selecting on the test set** — E106's exact failure, which E113 then traced
+to reading noise — and **+0.0020 against a ±0.006 paired interval is not a
+measurement**. The maximum of six draws from noise is positive by construction.
+**No candidate is promoted on this evidence.**
+
+**WHY IT FAILED, and E048's rule is sharper for it.** E048 asks whether a member
+is *comparable*. These are comparable in **kind** and behind in **quality**: five
+of six are the same `coatnet_rmlp_2_rw_384` as the incumbents, so they bring
+little disagreement, and they arrive 0.014–0.035 behind. The one genuinely
+different family, `cnv2b336`, is the **weakest of all at 0.8842** — and gave the
+second-largest single-add gain, which is the diversity effect showing up exactly
+where theory says it should and **at a size 58 studies cannot resolve**.
+
+**THE ROUTE IS CLOSED AT THIS GEOMETRY, NOT IN PRINCIPLE — stated as the caveat
+it was pre-declared to be.** The per-variant geometry is not in the files (`src`
+is only `'timm-pretrained'`), so every candidate ran at the dense geometry. The
+cost of that substitution is now **measured**: −0.0109 for `widedense-v4` and
+−0.0140 for `coatnet384`, against −0.0016 and −0.0004 for controls at their own
+geometry. So the candidates are penalised, and `v4` at its true geometry might
+reach ~0.916. **That is still behind `maxspan-v5`'s 0.9198**, and six members at
+parameter-free weights already lose, so recovering the geometry — a per-arm
+`CROP_MM`, which is a template change, plus upstream's write-up — is not worth
+the GPU. **Recorded as the open door it is, and left shut.**
+
+- **what it cost and what it bought**: 0.56 GPU-h, no submission. It closes
+  eleven checkpoints that looked like the best unexploited resource in the
+  project, and it leaves `gold_probs.csv` for ten arms on the 58 as a reusable
+  instrument.
+- **the 6 h of idle runtime is still idle.** The submission uses 2.80 h of a 9 h
+  cap. E117 says the idle hours cannot be filled from **this** account's bench,
+  because what is on it is behind what is already mounted.
+- **what remains open, unchanged**: the reseed control on the sixth v1 member
+  (~3.5 GPU-h) still settles E111 and the 2×2 at once. Quota is **3.40 h**,
+  refreshing 2026-09-19.
