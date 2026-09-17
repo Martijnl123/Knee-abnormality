@@ -7525,3 +7525,14 @@ the member jobs first would spend the same hours and learn less.
   deliberate push.
 - **`convnext_tiny` is flagged as a quota trap**: it failed twice on this lineage,
   OOM at batch 16 then host-killed at batch 4, ~3 GPU-h lost and undiagnosed.
+- **THE SIDESTEP I OFFERED DOES NOT EXIST, and computing the closure is what
+  showed it.** E118 above says a collaborator can dodge the team-merge condition
+  by rebuilding the caches himself, since they are CPU-only. **That is wrong.**
+  The closure of `knee-train-v1pubfull-r50` is four cache kernels, the trainer,
+  and two datasets — and the cache builder **itself mounts
+  `knee-phase1-artifacts`**, our LLM label pass over the competition's radiology
+  **reports**. He cannot rebuild that without redoing the label pass, so there is
+  no route around the merge. **The team merge is a hard prerequisite, not a
+  preference**, and it is the binding item on the whole collaboration.
+  `knee-phase1-public` remains the one shareable piece: a straight repackaging of
+  CC0 labels that are already public upstream.

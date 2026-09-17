@@ -325,35 +325,43 @@ entry to `your-name/knee-cache-build-0`, which does not exist, and the run would
 die at mount time with something that reads like a permissions error. Two tests
 in `tests/test_pipeline.py` pin this.
 
-**THE PREREQUISITE — and this one is a RULES question before it is a permissions
-question, so read it before you run anything.** `knee-train-v1pubfull-r50` mounts
-five things, all private:
+**HE PUSHES EXACTLY ONE KERNEL: `kaggle/97_train_v1pubfull_r50/`.** Nothing else.
+Everything below is about making that one push able to start.
+
+**THE FULL DEPENDENCY CLOSURE, computed rather than guessed** — five kernels and
+two datasets, all currently private on our account:
 
 ```
-achelijndiamantidis/knee-cache-build-0 .. -3   (competition-derived)
-achelijndiamantidis/knee-phase1-public         (CC0 labels)
+knee-cache-build-0 .. -3   CPU   kaggle/03_cache_build_shard{0..3}
+knee-train-v1pubfull-r50   GPU   kaggle/97_train_v1pubfull_r50   <- the only push
+achelijndiamantidis/knee-phase1-artifacts     (dataset)
+achelijndiamantidis/knee-phase1-public        (dataset)
 ```
 
-- **We must NOT make the cache kernels public.** Their `competition_sources` is
-  the RSNA competition, so their outputs are **derived from competition data**.
-  Publishing them redistributes competition data, which the rules prohibit. That
-  would be a worse mistake than the API-key one, and harder to undo.
-- **We can only share them privately with you if you are ON OUR TEAM.** Kaggle's
-  standard rule is that privately sharing code or data **outside of teams** is not
-  permitted. So if the merge has not happened, asking us to share the cache is
-  asking us to break the rule. **Merge first — deadline 2026-10-15.**
-- **Or sidestep it entirely: rebuild the cache yourself.** You are a competition
-  participant with your own data access, so building your own cache from the
-  competition DICOMs is unambiguously fine whatever your team status. It is
-  `kaggle/03_cache_build_shard{0..3}/`, four shards, and **they are CPU kernels —
-  `enable_gpu: false`, so they cost none of your 30 GPU-h.** Set
-  `KAGGLE_PUSH_ACCOUNT` to your username and push all four; your trainer then
-  mounts your own caches and needs nothing from us.
-- `knee-phase1-public` is the CC0 label set repackaged, not competition data, so
-  that one we can simply hand you.
+**STEP 0, AND IT IS NOT OPTIONAL: THE TEAM MERGE HAS TO HAPPEN FIRST.** Two of
+those are derived from competition data — the caches from the DICOMs, and
+`knee-phase1-artifacts` from the radiology **reports**. Publishing either
+redistributes competition-derived data, and Kaggle prohibits privately sharing
+code or data **outside of teams**. So:
 
-**If your run dies at startup, this is why**, and it will look like a permissions
-error rather than what it is.
+- **we cannot share them with him before the merge**, and asking us to is asking
+  us to break the rule;
+- **and he cannot route around it by rebuilding.** The obvious sidestep — build
+  your own caches, they are CPU and cost no quota — **does not work**, because the
+  cache builder itself mounts `knee-phase1-artifacts`, which is our LLM label pass
+  over the reports and not something he can regenerate without redoing it.
+- `knee-phase1-public` alone is safe to hand over: a straight repackaging of
+  `dreaddevelopment/rsna-knee-labels`, CC0-1.0, already public upstream.
+
+**Merge deadline is 2026-10-15.** Until then there is genuinely nothing he can run
+on this pipeline, and that is the single most important thing in this document.
+
+**STEP 1, once merged: we share all five kernels and both datasets** with his
+account — Kaggle UI, per item, Share → add collaborator. There is no API for it.
+
+**STEP 2: he pushes the one kernel.** His caches are then unnecessary; his trainer
+mounts ours, because `ACCOUNT` still resolves dependencies to our account while
+`KAGGLE_PUSH_ACCOUNT` puts the new kernel under his.
 
 **Change the seed and nothing else.** That single-variable change *is* the
 experiment (§7.1). Same backbone, epochs, batch, accumulation, LR,
