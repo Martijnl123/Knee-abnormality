@@ -325,43 +325,51 @@ entry to `your-name/knee-cache-build-0`, which does not exist, and the run would
 die at mount time with something that reads like a permissions error. Two tests
 in `tests/test_pipeline.py` pin this.
 
-**HE PUSHES EXACTLY ONE KERNEL: `kaggle/97_train_v1pubfull_r50/`.** Nothing else.
-Everything below is about making that one push able to start.
+**HE CAN RUN THE WHOLE CHAIN TODAY, WITHOUT THE MERGE AND WITHOUT ANYTHING
+PRIVATE OF OURS.** An earlier draft of this section said the merge was a hard
+prerequisite. **That was wrong** — it traced the dependency chain one level too
+shallow. `kaggle/00_dicom_header_scan/` mounts the **competition and nothing
+else** (`dataset_sources: []`, `kernel_sources: []`, CPU), so the chain
+bootstraps from a bare competition account.
 
-**THE FULL DEPENDENCY CLOSURE, computed rather than guessed** — five kernels and
-two datasets, all currently private on our account:
+**Three pushes, in order. Only the last one costs GPU.**
 
+```bash
+export KAGGLE_API_TOKEN=<HIS token, set in his shell, never in a chat>
+export KAGGLE_PUSH_ACCOUNT=<his-kaggle-username>
+
+# 1. CPU, no quota. Competition data only. Produces series_headers.parquet.
+kaggle kernels push -p kaggle/00_dicom_header_scan
+#    then download its output and publish it as his own dataset, e.g.
+#    <his-name>/knee-phase1-artifacts
+export KAGGLE_ARTIFACTS_DATASET=<his-name>/knee-phase1-artifacts
+
+# 2. CPU, no quota. Four shards, builds his own volume cache.
+export KAGGLE_PUBLIC_DATASET=<his-name>/knee-phase1-public   # see labels below
+python eda/generate_kernels.py --write && bash eda/preflight.sh
+for s in 0 1 2 3; do kaggle kernels push -p kaggle/03_cache_build_shard$s; done
+
+# 3. GPU, ~3.5 h. THE EXPERIMENT. seed=3 -> seed=11 in src/pipeline.py first.
+python eda/generate_kernels.py --write && bash eda/preflight.sh
+kaggle kernels push -p kaggle/97_train_v1pubfull_r50
 ```
-knee-cache-build-0 .. -3   CPU   kaggle/03_cache_build_shard{0..3}
-knee-train-v1pubfull-r50   GPU   kaggle/97_train_v1pubfull_r50   <- the only push
-achelijndiamantidis/knee-phase1-artifacts     (dataset)
-achelijndiamantidis/knee-phase1-public        (dataset)
-```
 
-**STEP 0, AND IT IS NOT OPTIONAL: THE TEAM MERGE HAS TO HAPPEN FIRST.** Two of
-those are derived from competition data — the caches from the DICOMs, and
-`knee-phase1-artifacts` from the radiology **reports**. Publishing either
-redistributes competition-derived data, and Kaggle prohibits privately sharing
-code or data **outside of teams**. So:
+**The labels are the one piece he does not have to rebuild.**
+`knee-phase1-public` is a straight repackaging of `dreaddevelopment/rsna-knee-labels`
+— **CC0-1.0 and already public upstream**, so nothing about handing it over or
+republishing it is restricted. He can take the upstream dataset directly, or we
+give him ours; either way `KAGGLE_PUBLIC_DATASET` points at it.
 
-- **we cannot share them with him before the merge**, and asking us to is asking
-  us to break the rule;
-- **and he cannot route around it by rebuilding.** The obvious sidestep — build
-  your own caches, they are CPU and cost no quota — **does not work**, because the
-  cache builder itself mounts `knee-phase1-artifacts`, which is our LLM label pass
-  over the reports and not something he can regenerate without redoing it.
-- `knee-phase1-public` alone is safe to hand over: a straight repackaging of
-  `dreaddevelopment/rsna-knee-labels`, CC0-1.0, already public upstream.
+**What the merge still governs** is only whether he can mount **our** caches and
+**our** artifacts and skip steps 1–2. Those two are competition-derived and stay
+team-only. **It no longer blocks him from working** — it just decides whether he
+spends a few CPU-hours bootstrapping first. CPU kernels do not touch the 30 GPU-h.
 
-**Merge deadline is 2026-10-15.** Until then there is genuinely nothing he can run
-on this pipeline, and that is the single most important thing in this document.
-
-**STEP 1, once merged: we share all five kernels and both datasets** with his
-account — Kaggle UI, per item, Share → add collaborator. There is no API for it.
-
-**STEP 2: he pushes the one kernel.** His caches are then unnecessary; his trainer
-mounts ours, because `ACCOUNT` still resolves dependencies to our account while
-`KAGGLE_PUSH_ACCOUNT` puts the new kernel under his.
+**Why `ARTIFACTS_DATASET` and `PUBLIC_DATASET` are environment overrides at all**:
+hardcoded, a teammate with GPU could do nothing until a merge that may be weeks
+out. Three tests pin this — the overrides reach both the cache builder and the
+trainer, and the header scan never grows a dependency that would break the
+bootstrap.
 
 **Change the seed and nothing else.** That single-variable change *is* the
 experiment (§7.1). Same backbone, epochs, batch, accumulation, LR,

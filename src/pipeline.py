@@ -65,13 +65,27 @@ ACCOUNT = "achelijndiamantidis"
 # to mount has to be shared with them FIRST or their run dies at startup.
 PUSH_ACCOUNT = os.environ.get("KAGGLE_PUSH_ACCOUNT", ACCOUNT)
 COMPETITION = "rsna-knee-abnormality-detection"
-ARTIFACTS_DATASET = f"{ACCOUNT}/knee-phase1-artifacts"
+# The two datasets a collaborator cannot be given before a team merge, because
+# both are derived from competition data -- headers from the DICOMs, labels from
+# the reports. Overridable so someone with their own competition access can point
+# the pipeline at datasets THEY built and depend on nothing of ours:
+#
+#   KAGGLE_ARTIFACTS_DATASET=their-name/their-artifacts
+#   KAGGLE_PUBLIC_DATASET=their-name/their-public-labels
+#
+# `kaggle/00_dicom_header_scan/` mounts the competition and NOTHING else, so the
+# whole chain is reproducible from a bare competition account: header scan (CPU)
+# -> package its `series_headers.parquet` as their artifacts dataset -> cache
+# build (CPU) -> trainer (GPU). Nothing private of ours appears anywhere in it.
+ARTIFACTS_DATASET = os.environ.get(
+    "KAGGLE_ARTIFACTS_DATASET", f"{ACCOUNT}/knee-phase1-artifacts")
 # Same headers, but soft_labels.parquet is the FUSION of the lexicon labeler
 # and the LLM reader. A separate dataset rather than a new version of the
 # one above, so every run already made stays comparable — replacing the
 # labels in place would silently change what every earlier number meant.
 FUSED_DATASET = f"{ACCOUNT}/knee-phase1-fused"
-PUBLIC_DATASET = f"{ACCOUNT}/knee-phase1-public"
+PUBLIC_DATASET = os.environ.get(
+    "KAGGLE_PUBLIC_DATASET", f"{ACCOUNT}/knee-phase1-public")
 DISTILLED_DATASET = f"{ACCOUNT}/knee-phase1-distilled"
 # THE TWO ARMS OF E104, AND WHY THERE ARE TWO.
 #

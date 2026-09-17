@@ -7536,3 +7536,30 @@ the member jobs first would spend the same hours and learn less.
   preference**, and it is the binding item on the whole collaboration.
   `knee-phase1-public` remains the one shareable piece: a straight repackaging of
   CC0 labels that are already public upstream.
+- **AND THE "HARD PREREQUISITE" WAS WRONG TOO — the chain bootstraps from a bare
+  competition account.** The correction above traced the closure one level too
+  shallow and concluded the team merge blocked everything. It does not.
+  `kaggle/00_dicom_header_scan/` mounts the **competition and nothing else**
+  (`dataset_sources: []`, `kernel_sources: []`, `enable_gpu: false`), and it
+  produces the `series_headers.parquet` the cache builder wants. So a
+  collaborator with their own competition access runs **header scan (CPU) →
+  package it as their artifacts dataset → cache build (CPU) → trainer (GPU)**,
+  and touches nothing private of ours. `ARTIFACTS_DATASET` and `PUBLIC_DATASET`
+  are now `KAGGLE_ARTIFACTS_DATASET` / `KAGGLE_PUBLIC_DATASET` overrides so that
+  path needs no source edit, with three tests pinning it — the overrides reach
+  both the cache builder and the trainer, and the header scan may not grow a
+  dependency without failing a test.
+
+  **The merge now governs only a shortcut**: whether he may mount OUR caches and
+  artifacts and skip the two CPU stages. Those stay team-only, because they are
+  competition-derived. **The labels never needed the merge at all** —
+  `knee-phase1-public` repackages `dreaddevelopment/rsna-knee-labels`, CC0-1.0
+  and already public upstream.
+
+  **Recorded as two corrections in one entry because both were mine, made an hour
+  apart, and each would have idled a teammate's GPU for weeks.** The first said
+  rebuilding the cache was a legal sidestep and missed that the cache builder
+  mounts a competition-derived dataset. The second concluded from that there was
+  no way in at all, and missed that the dataset is reproducible from a kernel
+  already in the tree. **Computing a closure is not the same as reading what sits
+  at the root of it.**

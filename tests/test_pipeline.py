@@ -1068,3 +1068,53 @@ def test_push_account_moves_the_kernel_id_and_nothing_else(monkeypatch):
 def test_reloading_pipeline_restores_the_default_account():
     """The reload above must not leak into whatever test runs next."""
     assert pipeline.PUSH_ACCOUNT == pipeline.ACCOUNT == "achelijndiamantidis"
+
+
+def test_a_collaborator_can_repoint_every_blocking_dataset(monkeypatch):
+    """The whole chain must be runnable from a bare competition account.
+
+    Two datasets cannot be shared before a team merge because both are derived
+    from competition data -- headers from the DICOMs, labels from the reports.
+    If they were hardcoded, a teammate with GPU could do nothing until the merge.
+    Overridable, they can build their own and depend on nothing of ours.
+    """
+    import importlib
+
+    monkeypatch.setenv("KAGGLE_PUSH_ACCOUNT", "a-teammate")
+    monkeypatch.setenv("KAGGLE_ARTIFACTS_DATASET", "a-teammate/their-artifacts")
+    monkeypatch.setenv("KAGGLE_PUBLIC_DATASET", "a-teammate/their-labels")
+    mod = importlib.reload(pipeline)
+    try:
+        ours = "achelijndiamantidis"
+        for slug in ("knee-cache-build-0", "knee-train-v1pubfull-r50"):
+            kern = next(k for k in mod.all_kernels() if k.slug == slug)
+            meta = kern.metadata()
+            assert meta["id"].startswith("a-teammate/")
+            for src in meta["dataset_sources"]:
+                assert not src.startswith(ours), (
+                    f"{slug} still mounts {src}, which cannot be shared before a "
+                    "team merge -- the override did not reach it")
+    finally:
+        for var in ("KAGGLE_PUSH_ACCOUNT", "KAGGLE_ARTIFACTS_DATASET",
+                    "KAGGLE_PUBLIC_DATASET"):
+            monkeypatch.delenv(var, raising=False)
+        importlib.reload(pipeline)
+
+
+def test_the_header_scan_needs_nothing_but_the_competition():
+    """It is the root of the chain, and that is what makes the chain portable.
+
+    If this ever grows a dataset or kernel source, a collaborator without our
+    private assets can no longer bootstrap, and the runbook in
+    COMMENTS_FOR_MARTIJN.md silently becomes wrong.
+    """
+    import json
+    from pathlib import Path
+
+    meta = json.loads(
+        (Path(__file__).resolve().parents[1]
+         / "kaggle/00_dicom_header_scan/kernel-metadata.json").read_text())
+    assert meta["dataset_sources"] == []
+    assert meta["kernel_sources"] == []
+    assert meta["competition_sources"] == ["rsna-knee-abnormality-detection"]
+    assert meta["enable_gpu"] is False, "the bootstrap must not cost GPU quota"
