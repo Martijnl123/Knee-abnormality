@@ -1118,3 +1118,34 @@ def test_the_header_scan_needs_nothing_but_the_competition():
     assert meta["kernel_sources"] == []
     assert meta["competition_sources"] == ["rsna-knee-abnormality-detection"]
     assert meta["enable_gpu"] is False, "the bootstrap must not cost GPU quota"
+
+
+def test_depends_account_is_separate_from_both_other_accounts(monkeypatch):
+    """A collaborator building their own caches must mount THEIR caches.
+
+    `depends` resolving through ACCOUNT is right for us and wrong for someone
+    bootstrapping from a bare competition account: their trainer would mount our
+    private cache kernels and die at startup. It is a third name because it is a
+    third question -- who pushes, who owns the datasets, whose outputs to mount.
+    """
+    import importlib
+
+    monkeypatch.setenv("KAGGLE_PUSH_ACCOUNT", "a-teammate")
+    monkeypatch.setenv("KAGGLE_DEPENDS_ACCOUNT", "a-teammate")
+    monkeypatch.setenv("KAGGLE_ARTIFACTS_DATASET", "a-teammate/their-artifacts")
+    monkeypatch.setenv("KAGGLE_PUBLIC_DATASET", "a-teammate/their-labels")
+    mod = importlib.reload(pipeline)
+    try:
+        kern = next(k for k in mod.all_kernels()
+                    if k.slug == "knee-train-v1pubfull-r50")
+        meta = kern.metadata()
+        assert meta["kernel_sources"], "the trainer must still mount caches"
+        for src in meta["kernel_sources"]:
+            assert src.startswith("a-teammate/"), (
+                f"{src} still points at our account; a collaborator who built "
+                "their own caches cannot mount it")
+    finally:
+        for var in ("KAGGLE_PUSH_ACCOUNT", "KAGGLE_DEPENDS_ACCOUNT",
+                    "KAGGLE_ARTIFACTS_DATASET", "KAGGLE_PUBLIC_DATASET"):
+            monkeypatch.delenv(var, raising=False)
+        importlib.reload(pipeline)

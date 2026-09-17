@@ -7563,3 +7563,19 @@ the member jobs first would spend the same hours and learn less.
   no way in at all, and missed that the dataset is reproducible from a kernel
   already in the tree. **Computing a closure is not the same as reading what sits
   at the root of it.**
+- **A THIRD ACCOUNT NAME WAS NEEDED, and packaging the notebooks is what found
+  it.** `PUSH_ACCOUNT` moved the kernel id and `ARTIFACTS_DATASET`/
+  `PUBLIC_DATASET` moved the datasets, but `depends` still resolved through
+  `ACCOUNT` — so a collaborator who had just built **his own** caches got a
+  trainer that mounted **ours**, which he cannot read. It would have failed at
+  startup after five successful CPU notebooks, looking like a permissions
+  problem. Added `DEPENDS_ACCOUNT` (`KAGGLE_DEPENDS_ACCOUNT`, default `ACCOUNT`)
+  with a test asserting every `kernel_sources` entry follows it. Three names for
+  three questions: **who pushes, who owns the datasets, whose outputs to mount.**
+  Folding any pair together breaks one of the two cases.
+- **the handover is now files rather than commands.** Six notebook folders
+  pre-wired to the collaborator's account with `RUN_SEED = 11`, each carrying the
+  `kernel-metadata.json` that says what to attach, so nothing is edited by hand
+  and no token is needed — the Kaggle UI is sufficient. Generated with the
+  overrides set, copied out, and the repo tree regenerated and drift-checked back
+  to `RUN_SEED = 3`.

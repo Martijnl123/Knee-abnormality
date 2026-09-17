@@ -64,6 +64,17 @@ ACCOUNT = "achelijndiamantidis"
 # are private by default (`is_private: true`), so anything a collaborator needs
 # to mount has to be shared with them FIRST or their run dies at startup.
 PUSH_ACCOUNT = os.environ.get("KAGGLE_PUSH_ACCOUNT", ACCOUNT)
+
+# DEPENDS_ACCOUNT owns the kernels whose OUTPUTS get mounted -- the caches and
+# trainers named in `depends`. It is a third name because it answers a third
+# question, and a collaborator needs it set differently from the other two.
+#
+# Someone bootstrapping from a bare competition account builds their OWN caches,
+# so their trainer must mount `their-name/knee-cache-build-0`. Someone who has
+# been given access to ours leaves it alone and mounts ours. Folding this into
+# PUSH_ACCOUNT would force the first case on everyone who sets a push account,
+# and folding it into ACCOUNT would move the datasets too.
+DEPENDS_ACCOUNT = os.environ.get("KAGGLE_DEPENDS_ACCOUNT", ACCOUNT)
 COMPETITION = "rsna-knee-abnormality-detection"
 # The two datasets a collaborator cannot be given before a team merge, because
 # both are derived from competition data -- headers from the DICOMs, labels from
@@ -318,7 +329,7 @@ class Kernel:
             "machine_shape": T4 if self.gpu else "",
             "dataset_sources": list(self.datasets),
             "competition_sources": [COMPETITION],
-            "kernel_sources": ([f"{ACCOUNT}/{d}" for d in self.depends]
+            "kernel_sources": ([f"{DEPENDS_ACCOUNT}/{d}" for d in self.depends]
                                + list(self.external_kernels)),
             "model_sources": [],
         }
