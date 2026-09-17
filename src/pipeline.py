@@ -64,14 +64,39 @@ ACCOUNT = "achelijndiamantidis"
 # are private by default (`is_private: true`), so anything a collaborator needs
 # to mount has to be shared with them FIRST or their run dies at startup.
 PUSH_ACCOUNT = os.environ.get("KAGGLE_PUSH_ACCOUNT", ACCOUNT)
+
+# DEPENDS_ACCOUNT owns the kernels whose OUTPUTS get mounted -- the caches and
+# trainers named in `depends`. It is a third name because it answers a third
+# question, and a collaborator needs it set differently from the other two.
+#
+# Someone bootstrapping from a bare competition account builds their OWN caches,
+# so their trainer must mount `their-name/knee-cache-build-0`. Someone who has
+# been given access to ours leaves it alone and mounts ours. Folding this into
+# PUSH_ACCOUNT would force the first case on everyone who sets a push account,
+# and folding it into ACCOUNT would move the datasets too.
+DEPENDS_ACCOUNT = os.environ.get("KAGGLE_DEPENDS_ACCOUNT", ACCOUNT)
 COMPETITION = "rsna-knee-abnormality-detection"
-ARTIFACTS_DATASET = f"{ACCOUNT}/knee-phase1-artifacts"
+# The two datasets a collaborator cannot be given before a team merge, because
+# both are derived from competition data -- headers from the DICOMs, labels from
+# the reports. Overridable so someone with their own competition access can point
+# the pipeline at datasets THEY built and depend on nothing of ours:
+#
+#   KAGGLE_ARTIFACTS_DATASET=their-name/their-artifacts
+#   KAGGLE_PUBLIC_DATASET=their-name/their-public-labels
+#
+# `kaggle/00_dicom_header_scan/` mounts the competition and NOTHING else, so the
+# whole chain is reproducible from a bare competition account: header scan (CPU)
+# -> package its `series_headers.parquet` as their artifacts dataset -> cache
+# build (CPU) -> trainer (GPU). Nothing private of ours appears anywhere in it.
+ARTIFACTS_DATASET = os.environ.get(
+    "KAGGLE_ARTIFACTS_DATASET", f"{ACCOUNT}/knee-phase1-artifacts")
 # Same headers, but soft_labels.parquet is the FUSION of the lexicon labeler
 # and the LLM reader. A separate dataset rather than a new version of the
 # one above, so every run already made stays comparable — replacing the
 # labels in place would silently change what every earlier number meant.
 FUSED_DATASET = f"{ACCOUNT}/knee-phase1-fused"
-PUBLIC_DATASET = f"{ACCOUNT}/knee-phase1-public"
+PUBLIC_DATASET = os.environ.get(
+    "KAGGLE_PUBLIC_DATASET", f"{ACCOUNT}/knee-phase1-public")
 DISTILLED_DATASET = f"{ACCOUNT}/knee-phase1-distilled"
 # THE TWO ARMS OF E104, AND WHY THERE ARE TWO.
 #
@@ -304,7 +329,7 @@ class Kernel:
             "machine_shape": T4 if self.gpu else "",
             "dataset_sources": list(self.datasets),
             "competition_sources": [COMPETITION],
-            "kernel_sources": ([f"{ACCOUNT}/{d}" for d in self.depends]
+            "kernel_sources": ([f"{DEPENDS_ACCOUNT}/{d}" for d in self.depends]
                                + list(self.external_kernels)),
             "model_sources": [],
         }

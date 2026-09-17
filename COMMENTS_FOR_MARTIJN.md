@@ -325,35 +325,51 @@ entry to `your-name/knee-cache-build-0`, which does not exist, and the run would
 die at mount time with something that reads like a permissions error. Two tests
 in `tests/test_pipeline.py` pin this.
 
-**THE PREREQUISITE — and this one is a RULES question before it is a permissions
-question, so read it before you run anything.** `knee-train-v1pubfull-r50` mounts
-five things, all private:
+**HE CAN RUN THE WHOLE CHAIN TODAY, WITHOUT THE MERGE AND WITHOUT ANYTHING
+PRIVATE OF OURS.** An earlier draft of this section said the merge was a hard
+prerequisite. **That was wrong** — it traced the dependency chain one level too
+shallow. `kaggle/00_dicom_header_scan/` mounts the **competition and nothing
+else** (`dataset_sources: []`, `kernel_sources: []`, CPU), so the chain
+bootstraps from a bare competition account.
 
+**Three pushes, in order. Only the last one costs GPU.**
+
+```bash
+export KAGGLE_API_TOKEN=<HIS token, set in his shell, never in a chat>
+export KAGGLE_PUSH_ACCOUNT=<his-kaggle-username>
+
+# 1. CPU, no quota. Competition data only. Produces series_headers.parquet.
+kaggle kernels push -p kaggle/00_dicom_header_scan
+#    then download its output and publish it as his own dataset, e.g.
+#    <his-name>/knee-phase1-artifacts
+export KAGGLE_ARTIFACTS_DATASET=<his-name>/knee-phase1-artifacts
+
+# 2. CPU, no quota. Four shards, builds his own volume cache.
+export KAGGLE_PUBLIC_DATASET=<his-name>/knee-phase1-public   # see labels below
+python eda/generate_kernels.py --write && bash eda/preflight.sh
+for s in 0 1 2 3; do kaggle kernels push -p kaggle/03_cache_build_shard$s; done
+
+# 3. GPU, ~3.5 h. THE EXPERIMENT. seed=3 -> seed=11 in src/pipeline.py first.
+python eda/generate_kernels.py --write && bash eda/preflight.sh
+kaggle kernels push -p kaggle/97_train_v1pubfull_r50
 ```
-achelijndiamantidis/knee-cache-build-0 .. -3   (competition-derived)
-achelijndiamantidis/knee-phase1-public         (CC0 labels)
-```
 
-- **We must NOT make the cache kernels public.** Their `competition_sources` is
-  the RSNA competition, so their outputs are **derived from competition data**.
-  Publishing them redistributes competition data, which the rules prohibit. That
-  would be a worse mistake than the API-key one, and harder to undo.
-- **We can only share them privately with you if you are ON OUR TEAM.** Kaggle's
-  standard rule is that privately sharing code or data **outside of teams** is not
-  permitted. So if the merge has not happened, asking us to share the cache is
-  asking us to break the rule. **Merge first — deadline 2026-10-15.**
-- **Or sidestep it entirely: rebuild the cache yourself.** You are a competition
-  participant with your own data access, so building your own cache from the
-  competition DICOMs is unambiguously fine whatever your team status. It is
-  `kaggle/03_cache_build_shard{0..3}/`, four shards, and **they are CPU kernels —
-  `enable_gpu: false`, so they cost none of your 30 GPU-h.** Set
-  `KAGGLE_PUSH_ACCOUNT` to your username and push all four; your trainer then
-  mounts your own caches and needs nothing from us.
-- `knee-phase1-public` is the CC0 label set repackaged, not competition data, so
-  that one we can simply hand you.
+**The labels are the one piece he does not have to rebuild.**
+`knee-phase1-public` is a straight repackaging of `dreaddevelopment/rsna-knee-labels`
+— **CC0-1.0 and already public upstream**, so nothing about handing it over or
+republishing it is restricted. He can take the upstream dataset directly, or we
+give him ours; either way `KAGGLE_PUBLIC_DATASET` points at it.
 
-**If your run dies at startup, this is why**, and it will look like a permissions
-error rather than what it is.
+**What the merge still governs** is only whether he can mount **our** caches and
+**our** artifacts and skip steps 1–2. Those two are competition-derived and stay
+team-only. **It no longer blocks him from working** — it just decides whether he
+spends a few CPU-hours bootstrapping first. CPU kernels do not touch the 30 GPU-h.
+
+**Why `ARTIFACTS_DATASET` and `PUBLIC_DATASET` are environment overrides at all**:
+hardcoded, a teammate with GPU could do nothing until a merge that may be weeks
+out. Three tests pin this — the overrides reach both the cache builder and the
+trainer, and the header scan never grows a dependency that would break the
+bootstrap.
 
 **Change the seed and nothing else.** That single-variable change *is* the
 experiment (§7.1). Same backbone, epochs, batch, accumulation, LR,

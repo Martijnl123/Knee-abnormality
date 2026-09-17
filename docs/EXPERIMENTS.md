@@ -7525,3 +7525,57 @@ the member jobs first would spend the same hours and learn less.
   deliberate push.
 - **`convnext_tiny` is flagged as a quota trap**: it failed twice on this lineage,
   OOM at batch 16 then host-killed at batch 4, ~3 GPU-h lost and undiagnosed.
+- **THE SIDESTEP I OFFERED DOES NOT EXIST, and computing the closure is what
+  showed it.** E118 above says a collaborator can dodge the team-merge condition
+  by rebuilding the caches himself, since they are CPU-only. **That is wrong.**
+  The closure of `knee-train-v1pubfull-r50` is four cache kernels, the trainer,
+  and two datasets — and the cache builder **itself mounts
+  `knee-phase1-artifacts`**, our LLM label pass over the competition's radiology
+  **reports**. He cannot rebuild that without redoing the label pass, so there is
+  no route around the merge. **The team merge is a hard prerequisite, not a
+  preference**, and it is the binding item on the whole collaboration.
+  `knee-phase1-public` remains the one shareable piece: a straight repackaging of
+  CC0 labels that are already public upstream.
+- **AND THE "HARD PREREQUISITE" WAS WRONG TOO — the chain bootstraps from a bare
+  competition account.** The correction above traced the closure one level too
+  shallow and concluded the team merge blocked everything. It does not.
+  `kaggle/00_dicom_header_scan/` mounts the **competition and nothing else**
+  (`dataset_sources: []`, `kernel_sources: []`, `enable_gpu: false`), and it
+  produces the `series_headers.parquet` the cache builder wants. So a
+  collaborator with their own competition access runs **header scan (CPU) →
+  package it as their artifacts dataset → cache build (CPU) → trainer (GPU)**,
+  and touches nothing private of ours. `ARTIFACTS_DATASET` and `PUBLIC_DATASET`
+  are now `KAGGLE_ARTIFACTS_DATASET` / `KAGGLE_PUBLIC_DATASET` overrides so that
+  path needs no source edit, with three tests pinning it — the overrides reach
+  both the cache builder and the trainer, and the header scan may not grow a
+  dependency without failing a test.
+
+  **The merge now governs only a shortcut**: whether he may mount OUR caches and
+  artifacts and skip the two CPU stages. Those stay team-only, because they are
+  competition-derived. **The labels never needed the merge at all** —
+  `knee-phase1-public` repackages `dreaddevelopment/rsna-knee-labels`, CC0-1.0
+  and already public upstream.
+
+  **Recorded as two corrections in one entry because both were mine, made an hour
+  apart, and each would have idled a teammate's GPU for weeks.** The first said
+  rebuilding the cache was a legal sidestep and missed that the cache builder
+  mounts a competition-derived dataset. The second concluded from that there was
+  no way in at all, and missed that the dataset is reproducible from a kernel
+  already in the tree. **Computing a closure is not the same as reading what sits
+  at the root of it.**
+- **A THIRD ACCOUNT NAME WAS NEEDED, and packaging the notebooks is what found
+  it.** `PUSH_ACCOUNT` moved the kernel id and `ARTIFACTS_DATASET`/
+  `PUBLIC_DATASET` moved the datasets, but `depends` still resolved through
+  `ACCOUNT` — so a collaborator who had just built **his own** caches got a
+  trainer that mounted **ours**, which he cannot read. It would have failed at
+  startup after five successful CPU notebooks, looking like a permissions
+  problem. Added `DEPENDS_ACCOUNT` (`KAGGLE_DEPENDS_ACCOUNT`, default `ACCOUNT`)
+  with a test asserting every `kernel_sources` entry follows it. Three names for
+  three questions: **who pushes, who owns the datasets, whose outputs to mount.**
+  Folding any pair together breaks one of the two cases.
+- **the handover is now files rather than commands.** Six notebook folders
+  pre-wired to the collaborator's account with `RUN_SEED = 11`, each carrying the
+  `kernel-metadata.json` that says what to attach, so nothing is edited by hand
+  and no token is needed — the Kaggle UI is sufficient. Generated with the
+  overrides set, copied out, and the repo tree regenerated and drift-checked back
+  to `RUN_SEED = 3`.
