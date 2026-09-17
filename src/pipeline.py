@@ -41,9 +41,29 @@ the manifest disagree, which is what keeps this file honest.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 
+# ACCOUNT owns the ASSETS -- the label datasets and the cache/trainer kernels that
+# everything here mounts. It is NOT "whoever is running this".
 ACCOUNT = "achelijndiamantidis"
+
+# PUSH_ACCOUNT owns the kernel being CREATED, and it is the only one of the two a
+# collaborator changes. A teammate lending GPU sets KAGGLE_PUSH_ACCOUNT to their
+# own username: their kernels are then created under their account while still
+# mounting OUR caches, datasets and trainers, which is the whole point -- the
+# assets do not move and no credential changes hands.
+#
+# Why this is two names and not one. Setting a single ACCOUNT to a teammate's
+# username would rewrite `kernel_sources` and every dataset id to
+# `their-name/knee-cache-build-0`, which does not exist, and the kernel would
+# fail at mount time with a message that looks like a permissions problem.
+#
+# PREREQUISITE, and it is a real one: a kernel or dataset can only be mounted by
+# another account if it is PUBLIC or explicitly shared with that account. Ours
+# are private by default (`is_private: true`), so anything a collaborator needs
+# to mount has to be shared with them FIRST or their run dies at startup.
+PUSH_ACCOUNT = os.environ.get("KAGGLE_PUSH_ACCOUNT", ACCOUNT)
 COMPETITION = "rsna-knee-abnormality-detection"
 ARTIFACTS_DATASET = f"{ACCOUNT}/knee-phase1-artifacts"
 # Same headers, but soft_labels.parquet is the FUSION of the lexicon labeler
@@ -272,7 +292,7 @@ class Kernel:
 
     def metadata(self) -> dict:
         return {
-            "id": f"{ACCOUNT}/{self.slug}",
+            "id": f"{PUSH_ACCOUNT}/{self.slug}",
             "title": self.slug,
             "code_file": "run.py",
             "language": "python",

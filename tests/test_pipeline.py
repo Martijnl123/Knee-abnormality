@@ -1023,3 +1023,48 @@ def test_no_generated_kernel_references_an_undefined_constant():
 
     assert not problems, "generated kernels reference undefined constants:\n" + \
         "\n".join(sorted(set(problems)))
+
+
+# --------------------------------------------------------------------------- #
+# Lending a teammate's GPU without moving the assets
+# --------------------------------------------------------------------------- #
+def test_push_account_defaults_to_the_asset_account():
+    """Unset, nothing moves. This is what keeps the generated tree stable."""
+    assert pipeline.PUSH_ACCOUNT == pipeline.ACCOUNT
+
+
+def test_push_account_moves_the_kernel_id_and_nothing_else(monkeypatch):
+    """A teammate running our kernels on their quota must still mount OUR assets.
+
+    The failure this guards is the whole reason PUSH_ACCOUNT exists as a second
+    name: rewriting one ACCOUNT to a collaborator's username would also rewrite
+    every `kernel_sources` entry and dataset id to `their-name/knee-cache-build-0`
+    -- which does not exist. The run then dies at mount time with something that
+    reads like a permissions error, and the actual cause is that the assets were
+    renamed out from under it.
+    """
+    import importlib
+
+    monkeypatch.setenv("KAGGLE_PUSH_ACCOUNT", "a-teammate")
+    mod = importlib.reload(pipeline)
+    try:
+        assert mod.PUSH_ACCOUNT == "a-teammate"
+        assert mod.ACCOUNT == "achelijndiamantidis", "the asset owner must not move"
+
+        kern = next(k for k in mod.all_kernels() if k.depends)
+        meta = kern.metadata()
+        assert meta["id"].startswith("a-teammate/"), "the kernel is created by them"
+        for src in meta["kernel_sources"]:
+            assert not src.startswith("a-teammate/"), (
+                f"{src} was rewritten to the pusher; dependency kernels live on "
+                "the asset account and mounting them is the point")
+        for src in meta["dataset_sources"]:
+            assert not src.startswith("a-teammate/"), f"{src} was rewritten"
+    finally:
+        monkeypatch.delenv("KAGGLE_PUSH_ACCOUNT", raising=False)
+        importlib.reload(pipeline)
+
+
+def test_reloading_pipeline_restores_the_default_account():
+    """The reload above must not leak into whatever test runs next."""
+    assert pipeline.PUSH_ACCOUNT == pipeline.ACCOUNT == "achelijndiamantidis"

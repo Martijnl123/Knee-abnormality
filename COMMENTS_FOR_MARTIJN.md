@@ -244,6 +244,54 @@ hunch:**
 
 ---
 
+## 7b. RUNBOOK — lending us your GPU, without sending anyone a key
+
+**Please do not send us your Kaggle API token, and we will not send you ours.** A
+token *is* the account: whoever holds it can submit, publish, and delete as you.
+Kaggle's rules are one account per person and no credential sharing, and the
+penalty if it is flagged is account bans plus team disqualification. **Final
+submission is 2026-10-22** — that risk is not worth the convenience, and there is
+nothing to gain anyway: we have five submissions a day and are using none of them.
+
+**The repo supports this properly instead.** `Kernel.external_kernels` feeds
+straight into `kernel_sources`, which is how another account's kernel output gets
+mounted — the same shape as mounting `dreaddevelopment`'s CC0 datasets.
+
+```bash
+git clone <this repo> && cd Knee-abnormality
+export KAGGLE_API_TOKEN=<YOUR token, never ours>
+export KAGGLE_PUSH_ACCOUNT=<your-kaggle-username>   # see the warning below
+# edit kaggle/97_train_v1pubfull_r50 via the MANIFEST, never the run.py:
+#   src/pipeline.py, knee-train-v1pubfull-r50: seed=3  ->  any other seed
+python eda/generate_kernels.py --write
+bash eda/preflight.sh
+kaggle kernels push -p kaggle/97_train_v1pubfull_r50
+```
+
+Then make that kernel **public** and send us `your-username/knee-train-v1pubfull-r50`.
+We add it to `external_kernels` on the blend kernel and measure. Your GPU, your
+account, our submission, no credentials anywhere.
+
+**`KAGGLE_PUSH_ACCOUNT` is deliberately NOT the same knob as `ACCOUNT`.**
+`ACCOUNT` names who owns the **assets** — the label datasets and the cache and
+trainer kernels everything mounts. `PUSH_ACCOUNT` names who owns the kernel being
+**created**. Setting a single name to yours would rewrite every `kernel_sources`
+entry to `your-name/knee-cache-build-0`, which does not exist, and the run would
+die at mount time with something that reads like a permissions error. Two tests
+in `tests/test_pipeline.py` pin this.
+
+**THE PREREQUISITE, which will bite before anything else does.** A kernel or
+dataset is only mountable by another account if it is **public or explicitly
+shared with that account**, and ours are `is_private: true` by default. **Tell us
+which slugs you need and we will share them first** — otherwise your run dies at
+startup and it will look like your fault.
+
+**Change the seed and nothing else.** That single-variable change *is* the
+experiment (§7.1). Same backbone, epochs, batch, accumulation, LR,
+`input_norm=False`.
+
+---
+
 ## 8. Operational things that will trip you up
 
 - **`kaggle competitions submit` does not work** for this competition — HTTP 400,
