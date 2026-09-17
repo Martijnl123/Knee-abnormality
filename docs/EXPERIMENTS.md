@@ -7465,3 +7465,63 @@ the GPU. **Recorded as the open door it is, and left shut.**
 - **what remains open, unchanged**: the reseed control on the sixth v1 member
   (~3.5 GPU-h) still settles E111 and the 2×2 at once. Quota is **3.40 h**,
   refreshing 2026-09-19.
+
+### E118 — the collaborator path, and a rules problem found in my own runbook
+- **date**: 2026-09-17. No GPU, no submission. Preparation, recorded because it
+  changed what we are allowed to do rather than only how we do it.
+
+**A TEAMMATE HAS GPU, AND THE FIRST INSTINCT WAS THE WRONG ONE.** The proposal was
+to take his Kaggle API token and push kernels as him. **A token is the account** —
+whoever holds it can submit, publish and delete — and Kaggle's rules are one
+account per person with no credential sharing. The penalty if flagged is account
+bans plus team disqualification, against a final submission on 2026-10-22. There
+is also **nothing to gain**: we have five submissions a day and used **zero** on
+the 16th and 17th. **Submissions stopped being the scarce resource some time ago;
+GPU hours and surviving ideas are what is scarce.**
+
+**THE SUPPORTED PATH ALREADY EXISTED.** `Kernel.external_kernels` feeds straight
+into `kernel_sources` and is already covered by a test — a foreign `owner/slug`
+mounts exactly as `dreaddevelopment`'s CC0 datasets do. So a collaborator trains
+on their quota, publishes, and we mount the result. No credential moves.
+
+**WHAT NEEDED FIXING WAS `ACCOUNT`, WHICH WAS DOING TWO JOBS.** It named both the
+account that **owns the assets** (label datasets, cache and trainer kernels) and
+the account that **pushes**. Telling a collaborator to "set ACCOUNT to your
+username" — which is what the first draft of the runbook said — would have
+rewritten every `kernel_sources` entry to `their-name/knee-cache-build-0`, which
+does not exist, and killed the run at mount time **with a message that reads like
+a permissions error**. Split into `ACCOUNT` (assets) and `PUSH_ACCOUNT` (from
+`KAGGLE_PUSH_ACCOUNT`, default `ACCOUNT`), with two tests pinning that the id
+moves and the sources do not. Unset, the generated tree is **byte-identical** and
+the drift check confirms it.
+
+**AND THEN THE ACTUAL RULES PROBLEM, which the first runbook walked straight
+into.** It said: *tell us which slugs you need and we will share them first.* The
+trainer mounts `knee-cache-build-0..3`, whose `competition_sources` is the RSNA
+competition — **their outputs are derived from competition data**:
+
+- **public is out**: publishing them redistributes competition data.
+- **private sharing is out too, unless he is on the team**: Kaggle prohibits
+  privately sharing code or data **outside of teams**. So the sentence I wrote was
+  an instruction to break the rule if the merge has not happened. **Merge deadline
+  2026-10-15.**
+- **the clean sidestep**: he rebuilds the cache himself. He is a participant with
+  his own data access, and the four shard kernels are **`enable_gpu: false`** — so
+  it costs **none** of his 30 GPU-h and needs nothing from us.
+
+**THE JOB QUEUE IS ORDERED SO THAT ONE RUN CAN CANCEL THE REST.** The reseed
+control goes first, alone. The 2×2 says member count moved the board +0.002
+twice; that is either a real member effect or two draws from the floor, and **the
+two readings point opposite ways** — if real, ~26 h of more members is the best
+move this project has; if draw, those hours should not go there at all. Running
+the member jobs first would spend the same hours and learn less.
+
+- **a divergence is now documented rather than discovered later**: the repo ships
+  five members at 0.50, the live Kaggle notebook is version 6 at six members and
+  the E116 vector. Both are right for their job — the repo should not claim an
+  unresolved gain, and the live notebook is what scored the banked 0.940. **Pushing
+  kernel 86 now would make "newest version" the 0.938 configuration** and the next
+  Submit click would go backwards. It waits for the reseed answer, then one
+  deliberate push.
+- **`convnext_tiny` is flagged as a quota trap**: it failed twice on this lineage,
+  OOM at batch 16 then host-killed at batch 4, ~3 GPU-h lost and undiagnosed.

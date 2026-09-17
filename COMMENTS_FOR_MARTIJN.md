@@ -65,6 +65,25 @@ pre-registered reverts fired** (E111 and E116, §9b). The banked 0.940 is
 unaffected — the board keeps a team's best — so the reverts cost nothing and buy
 a manifest that does not claim more than it has shown.
 
+**THE REPO AND THE LIVE KAGGLE NOTEBOOK DIVERGE RIGHT NOW, ON PURPOSE. DO NOT
+PUSH KERNEL 86 TO KAGGLE UNTIL THE RESEED CONTROL LANDS.**
+
+| | v1 members | blend weight |
+|---|---|---|
+| `kaggle/86_infer_raptorv1/run.py` in this repo | **5** | **0.50** |
+| `knee-infer-raptorv1` **version 6**, live on Kaggle | **6** | the E116 vector |
+
+Both are correct, for different jobs. The **repo** reverted because +0.002 against
+a ±0.003 floor has not been shown to be anything, and a manifest should not claim
+what the instrument cannot resolve. The **live notebook** is the configuration
+that scored the banked **0.940**, and the board keeps a team's best.
+
+**So pushing kernel 86 right now would make "newest version" the 0.938
+configuration**, and the next person to click Submit would spend a submission
+going backwards. There is no reason to push it: we are not submitting anything
+until job 1 in §7 tells us whether the sixth member is real. **When it does, the
+answer sets `V1_MEMBERS` to 5 or 6 and the push happens then, once, deliberately.**
+
 Everything mounted is CC0. The licence audit is E043/E088/E100.
 
 ---
@@ -199,18 +218,44 @@ measured −0.0064 on this lineage**, and every v1 member ships with it off.
 
 ## 7. If you want to spend GPU, in the order I would spend it
 
-**1. THE RESEED CONTROL. ~3.5 GPU-h, and it is the only experiment currently
-ready to run.** Retrain the sixth v1 member — the full-fit resnet50, same labels,
-same geometry, `input_norm=False` — **with a different seed**, and blend it the
-same way. E092 built the ±0.003 floor by changing nothing but the RNG seed and
-watching 0.926 become 0.923/0.921. This separates *+0.002 of member* from *+0.002
-of draw*, and it settles **E111 and the whole 2×2 in §1 at once**. We cannot run
-it: quota is 3.40 h and it needs ~3.5 h. **If you have quota, run this.**
+**RUN THEM IN THIS ORDER, AND DO NOT RUN 2 BEFORE 1 LANDS.** This is the whole
+plan, and the ordering is not politeness — job 1 decides whether job 2 is worth
+any hours at all.
 
-**2. More v1 members, if 1 comes back positive.** Member count is the only lever
-with a measured board effect. If the sixth member survives its own reseed
-control, a seventh and eighth are the cheapest thing on the board at ~1.5 GPU-h
-each for resnet34.
+**1. THE RESEED CONTROL. ~3.5 GPU-h. Run this first, alone.** Retrain the sixth v1
+member — the full-fit resnet50, same labels, same geometry, `input_norm=False` —
+**with a different seed**, and blend it the same way. E092 built the ±0.003 floor
+by changing nothing but the RNG seed and watching 0.926 become 0.923/0.921.
+
+  **Why it gates everything.** The 2×2 in §1 says member count moved the board
+  +0.002 twice. That is either a real member effect or two draws from a ±0.003
+  floor, and **those two readings point opposite ways**: if it is real, spending
+  your remaining ~26 h on more members is the best move available to this project;
+  **if it is draw, more members are worth nothing and those hours should not be
+  spent that way at all.** One 3.5 h run tells us which. Running the member jobs
+  first and the control afterwards would buy the same hours and learn less.
+
+**2. MORE MEMBERS, ONLY IF 1 COMES BACK POSITIVE. ~7-20 GPU-h.** Member count is
+the only operation with a measured board effect, so this is where a positive
+control cashes out.
+
+  **Prefer depth over seeds.** E064 priced extra *same-lineage* members at
+  **+0.001**, and the v1 arm correlates 0.542 with the CoAtNet half against
+  0.905-0.986 among the CoAtNet arms — so what pays is **disagreement**, not more
+  of the same. Two more **resnet50** seeds (~3.5 h each) beat four more resnet34
+  seeds (~1.5 h each) even though they cost the same, because depth is the change
+  that showed +0.002 in the first place.
+
+  **A warning from our own logs**: `convnext_tiny` was tried twice on this
+  lineage and failed twice — CUDA OOM at batch 16 (960 images per batch), then the
+  host `Killed` it at batch 4, undiagnosed, ~3 GPU-h lost. **Do not spend your
+  quota re-running that** unless you want to debug it as its own task.
+
+  Each new member is a two-line change on our side once you send the slug:
+  `external_kernels` gains `your-name/<slug>` and `V1_MEMBERS` goes up by one.
+  The weight-fingerprint guard refuses to run if any two checkpoints are
+  identical, so a mis-copied member fails loudly instead of quietly averaging one
+  model twice.
 
 **3. Rubric-aligned ordinal labels.** The one remaining structural idea. The
 state ladder in `src/report_schema.py` is already ordinal and well built —
@@ -280,11 +325,35 @@ entry to `your-name/knee-cache-build-0`, which does not exist, and the run would
 die at mount time with something that reads like a permissions error. Two tests
 in `tests/test_pipeline.py` pin this.
 
-**THE PREREQUISITE, which will bite before anything else does.** A kernel or
-dataset is only mountable by another account if it is **public or explicitly
-shared with that account**, and ours are `is_private: true` by default. **Tell us
-which slugs you need and we will share them first** — otherwise your run dies at
-startup and it will look like your fault.
+**THE PREREQUISITE — and this one is a RULES question before it is a permissions
+question, so read it before you run anything.** `knee-train-v1pubfull-r50` mounts
+five things, all private:
+
+```
+achelijndiamantidis/knee-cache-build-0 .. -3   (competition-derived)
+achelijndiamantidis/knee-phase1-public         (CC0 labels)
+```
+
+- **We must NOT make the cache kernels public.** Their `competition_sources` is
+  the RSNA competition, so their outputs are **derived from competition data**.
+  Publishing them redistributes competition data, which the rules prohibit. That
+  would be a worse mistake than the API-key one, and harder to undo.
+- **We can only share them privately with you if you are ON OUR TEAM.** Kaggle's
+  standard rule is that privately sharing code or data **outside of teams** is not
+  permitted. So if the merge has not happened, asking us to share the cache is
+  asking us to break the rule. **Merge first — deadline 2026-10-15.**
+- **Or sidestep it entirely: rebuild the cache yourself.** You are a competition
+  participant with your own data access, so building your own cache from the
+  competition DICOMs is unambiguously fine whatever your team status. It is
+  `kaggle/03_cache_build_shard{0..3}/`, four shards, and **they are CPU kernels —
+  `enable_gpu: false`, so they cost none of your 30 GPU-h.** Set
+  `KAGGLE_PUSH_ACCOUNT` to your username and push all four; your trainer then
+  mounts your own caches and needs nothing from us.
+- `knee-phase1-public` is the CC0 label set repackaged, not competition data, so
+  that one we can simply hand you.
+
+**If your run dies at startup, this is why**, and it will look like a permissions
+error rather than what it is.
 
 **Change the seed and nothing else.** That single-variable change *is* the
 experiment (§7.1). Same backbone, epochs, batch, accumulation, LR,
