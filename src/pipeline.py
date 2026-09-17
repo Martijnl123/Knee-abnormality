@@ -410,6 +410,67 @@ RAPTOR_LAB = ("ACL", "MCL", "Medial Meniscus", "Lateral Meniscus", "Medial OA",
 RAPTOR_V5 = {"name": "maxspan-v5", "file": "raptor_ft_coatnet_v5_full_swa.pt",
              "img": 336, "slots": RAPTOR_SLOTS64, "span": (0.02, 0.98),
              "k_eval": 62, "reverse": False, "w": 0.55, "expect_gold": 0.9214}
+# E117's CANDIDATE ARMS. `dreaddevelopment` publishes FIFTEEN CC0 datasets
+# carrying FOURTEEN checkpoints; E086's inventory catalogued them and no
+# experiment has touched the eleven this project does not mount. Their stored
+# `gold_auc`, read 2026-09-17 from the files themselves:
+#
+#   coatnet_v4_full      0.9167     coatnet_v9_full   0.9031
+#   coatnet_v4_full_swa  0.9150     coatnet384        0.9025
+#   coatnet_v7_full_swa  0.9073     coatnet_v6_full   0.8997
+#   cnv2b336             0.8901     effv2l480         0.8716
+#
+# **v4_full at 0.9167 outscores native384-v8 at 0.9067, which the blend already
+# weights at 0.20.** Six sit inside E048's +/-0.02 comparability band against the
+# incumbents' 0.9067-0.9214; `effv2l480` at 0.8716 is 0.035 behind the weakest
+# incumbent, outside the band, and is NOT screened -- E048's four failed unions
+# all added a member 0.03-0.06 back.
+#
+# THE GEOMETRY IS NOT IN THE FILES. Each checkpoint stores `arch`, `res`,
+# `gold_auc` and `epoch`, but `src` is only 'timm-pretrained' -- the volume
+# geometry came from upstream's write-up for the three arms this project mounts,
+# and the dataset names (widedense, widefov, fullspan, finespacing) are all that
+# is known for the rest. So every candidate is screened AT THE DENSE GEOMETRY,
+# v10's, rather than at a guessed one. That is deliberate:
+#
+# - it costs ONE preprocessing signature. The template groups by signature, so
+#   screening six candidates at a shared geometry adds forward passes to caches
+#   the incumbents already build, and no new cache pass at all.
+# - it makes the comparison readable. Each candidate's measured gold against its
+#   own stored `gold_auc` is then a statement about THIS geometry, and a
+#   candidate that holds up at a geometry it was not trained for is a stronger
+#   member than one that needs its own.
+# - a shortfall is diagnosis, not rejection: it separates "wrong geometry" from
+#   "weak checkpoint", and the write-up can be read afterwards for any arm worth
+#   the second pass.
+#
+# `expect_gold` stays the MOUNT FINGERPRINT it is for the incumbents -- the value
+# the file carries, so a silent re-upload is caught -- and is NOT a prediction of
+# what these will score here.
+RAPTOR_DENSE = {"slots": RAPTOR_SLOTS64, "span": (0.02, 0.98),
+                "k_eval": 62, "img": 384, "reverse": False}
+RAPTOR_CANDIDATES = (
+    {"name": "cand-widedense-v4", "file": "raptor_ft_coatnet_v4_full.pt",
+     "w": 0.25, "expect_gold": 0.9167, **RAPTOR_DENSE},
+    {"name": "cand-fullspan-v7", "file": "raptor_ft_coatnet_v7_full_swa.pt",
+     "w": 0.25, "expect_gold": 0.9073, **RAPTOR_DENSE},
+    {"name": "cand-finespacing-v9", "file": "raptor_ft_coatnet_v9_full.pt",
+     "w": 0.25, "expect_gold": 0.9031, **RAPTOR_DENSE},
+    {"name": "cand-coatnet384", "file": "raptor_ft_coatnet384.pt",
+     "w": 0.25, "expect_gold": 0.9025, **RAPTOR_DENSE},
+    {"name": "cand-widefov-v6", "file": "raptor_ft_coatnet_v6_full_swa.pt",
+     "w": 0.25, "expect_gold": 0.8997, **RAPTOR_DENSE},
+    # The only candidate from a DIFFERENT BACKBONE FAMILY, and the reason it is
+    # screened at 0.8901 when a CoAtNet at that number would be marginal: the
+    # four CoAtNet arms correlate 0.905-0.986 with each other and 0.542 with the
+    # v1 arm, so what a union pays for here is disagreement, not rank. Its `res`
+    # is 336, so `img` 336 keeps the windows native and reuses maxspan's cache.
+    {"name": "cand-cnv2b336", "file": "raptor_ft_cnv2b336.pt",
+     "w": 0.25, "expect_gold": 0.8901,
+     "slots": RAPTOR_SLOTS64, "span": (0.02, 0.98), "k_eval": 62,
+     "img": 336, "reverse": False},
+)
+
 RAPTOR_ARMS = (
     RAPTOR_V5,
     {"name": "native384dense-v10", "file": "raptor_ft_coatnet_v10_full.pt",
@@ -1704,6 +1765,67 @@ EXTRAS = [
     #      the board measured at +0.004, and the four "not separated" blend
     #      readings (E033, E039, E046, E048) are void.
     # No outcome here is uninformative, which is the whole reason to run it.
+    Kernel(
+        slug="knee-gold-raptorcc0x10",
+        directory="98_gold_raptorcc0x10",
+        template="raptor_infer",
+        gpu=True,
+        internet=False,
+        datasets=["dreaddevelopment/raptor-knee-maxspan",
+                  "dreaddevelopment/raptor-knee-native384",
+                  "dreaddevelopment/raptor-knee-native384dense",
+                  # The six screened candidates (E117). All CC0-1.0, all from the
+                  # same account the four incumbent arms already come from.
+                  "dreaddevelopment/raptor-knee-widedense",
+                  "dreaddevelopment/raptor-knee-fullspan",
+                  "dreaddevelopment/raptor-knee-finespacing",
+                  "dreaddevelopment/raptor-knee-widefov",
+                  "dreaddevelopment/raptor-knee-arms"],
+        constants={
+            "MEMBERS_EXPECTED": 10,
+            "ARMS": RAPTOR_ARMS + RAPTOR_CANDIDATES,
+            "CROP_MM": 140.0,
+            "LAB": RAPTOR_LAB,
+            "FALLBACK_LIMIT": 0.02,
+            "DECODE_AHEAD": 32,
+            "EVAL_SPLIT": "gold",
+            "GOLD_EXPECTED": 58,
+            "V1_MEMBERS": None,
+        },
+        note="NOT A SUBMISSION. E117's SCREEN. Scores the four incumbent CC0\n"
+             "arms AND six unused CC0 checkpoints from the same account on the\n"
+             "58 expert studies, and dumps every arm's per-study probabilities.\n"
+             "\n"
+             "WHY THIS EXISTS. The blend runs THREE distinct checkpoints. The\n"
+             "account publishes FOURTEEN, all CC0, all licence-cleared in E086,\n"
+             "and no experiment has ever tested the other eleven. One of them,\n"
+             "`coatnet_v4_full` at a stored 0.9167, outscores `native384-v8` at\n"
+             "0.9067 which the blend already weights at 0.20.\n"
+             "\n"
+             "AND THE RUNTIME IS ALREADY PAID FOR. The submission uses 2.80 h\n"
+             "of a 9 h cap (1.13 + 0.58 + 0.41 CoAtNet, 0.68 v1), so there are\n"
+             "~6 h idle. Adding members is also the ONLY operation this project\n"
+             "has measured moving the board: five members scored 0.938 at two\n"
+             "blend weights, six scored 0.940 at two, so member count moved it\n"
+             "+0.002 twice while blend weight moved it 0.000 twice.\n"
+             "\n"
+             "WHAT TO READ FIRST in the log: the `[gold]` lines, and read them\n"
+             "against each file's own `author's gold` printed at load. The four\n"
+             "incumbents are the CONTROL -- if maxspan-v5 does not land near\n"
+             "0.9214 the run is not readable and nothing else in it means\n"
+             "anything. Every candidate runs at the DENSE geometry because the\n"
+             "per-variant geometry is not in the files, so a candidate scoring\n"
+             "below its stored number may be mis-geometried rather than weak.\n"
+             "\n"
+             "It writes no submission.csv on purpose: these 58 studies are\n"
+             "TRAINING data, and a notebook with no submission.csv cannot be\n"
+             "submitted by accident.\n"
+             "\n"
+             "COST: 58 studies, three preprocessing signatures, all of which\n"
+             "the incumbent arms already build. Budget ~1.5 GPU-h.\n"
+             "\n"
+             "ATTRIBUTION: all weights from `dreaddevelopment`, CC0-1.0.",
+    ),
     Kernel(
         slug="knee-gold-raptorcc0x4",
         directory="83_gold_raptorcc0x4",
