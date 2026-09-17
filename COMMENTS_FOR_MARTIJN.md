@@ -1,9 +1,9 @@
 # Comments for Martijn
 
-**Written 2026-09-15 07:15 UTC.** Everything here has a date on it because
-several numbers in this repo decay on their own — a rank in particular. If this
-header is more than a few days old, re-pull the leaderboard before trusting the
-priorities.
+**Written 2026-09-15, last revised 2026-09-17 after E117.** Everything here has
+a date on it because several numbers in this repo decay on their own — a rank in
+particular. If this header is more than a few days old, re-pull the leaderboard
+before trusting the priorities.
 
 ---
 
@@ -11,40 +11,78 @@ priorities.
 
 | | |
 |---|---|
-| **Board** | **0.940** (submitted 2026-09-16, E111's six-member blend) |
-| **Rank** | **688 of 3,839** — was 798 of 3,769 at 0.938 |
+| **Board** | **0.940** (2026-09-16) |
 | Top of board | 0.957 |
-| Submissions used | 22 total; 5/day, and we rarely use them |
+| **Submissions** | **5/day, and today we have used ZERO** |
+| **Our GPU quota** | **3.40 h left, refreshing 2026-09-19** |
+| Team merge deadline | 2026-10-15 |
 | Final submission | 2026-10-22 |
 
-**The rank moved 38 places overnight with no change to our score**, because 46
-teams joined and passed us. That is the single most important thing to
-understand about this leaderboard: standing still is losing ground.
+**SUBMISSIONS ARE NOT THE CONSTRAINT, AND THIS IS THE THING TO UNDERSTAND BEFORE
+ANYTHING ELSE.** We have five today and nothing that deserves one. Four of the
+last five submissions returned a number inside the reseed floor, which is another
+way of saying **we are no longer short of board attempts — we are short of things
+worth putting on the board.** What is actually scarce is **GPU hours** and
+**ideas that survive a clean instrument**.
 
-**The wall above us is dense.** 837 teams at ≥0.938, 706 at ≥0.940, 537 at
-≥0.941 — but only **81 at ≥0.945**. Between us and 0.945 there are ~720 teams in
-0.007 of AUC. It is not a gentle slope; it is a cliff at about 0.943.
+**Standing still is losing ground.** The rank moved 38 places overnight once with
+no change to our score, because 46 teams joined and passed us. **The wall above is
+dense**: ~837 teams at ≥0.938, 706 at ≥0.940, but only **81 at ≥0.945**. It is a
+cliff at about 0.943, not a slope.
 
-**Two documents in `docs/` are stale and will mislead you.** `PATH.md` says
-0.932 and rank ~1,166 (dated 2026-09-08); `STATUS.md` was last updated
-2026-09-07. **`docs/EXPERIMENTS.md` is current** — entries E092 through E109 are
-the last two weeks and they are where the real state lives. Read backwards from
-E109.
+**The four-submission 2×2 is the most useful thing we have learned about this
+board**, and it fell out of submissions spent on other questions:
+
+| | blend 0.40 / 0.43 | blend 0.50 |
+|---|---:|---:|
+| **five v1 members** | 0.938 | 0.938 |
+| **six v1 members** | **0.940** | **0.940** |
+
+**Member count moved the board +0.002 twice. Blend weight moved it 0.000 twice.**
+Neither margin escapes the ±0.003 reseed floor (E092), so nothing is *resolved* —
+but a margin reproduced under a nuisance change is better evidence than a single
+one, and a null reproduced under two member counts is a firmer null. **Adding
+members is the only operation that has ever moved this board.**
+
+**`docs/EXPERIMENTS.md` is the only current document.** Read backwards from
+**E117**. `PATH.md`'s header is current; the rest of `docs/` is older than the
+standing score.
 
 ---
 
 ## 2. What we are submitting, exactly
 
 One kernel: **`knee-infer-raptorv1`** (`kaggle/86_infer_raptorv1/`). Two arms,
-rank-blended 50/50:
+rank-blended **50/50**:
 
-- **Four CC0 CoAtNet models** from `dreaddevelopment`, at the blend weights their
-  authors published (0.55 / 0.20 / 0.15 / 0.10). Alone: board 0.932.
+- **Four CC0 CoAtNet arms** from `dreaddevelopment` at the blend weights their
+  authors published (0.55 / 0.20 / 0.15 / 0.10), from **three** distinct
+  checkpoints. Alone: board 0.932.
 - **Five full-fit resnet34** 2.5D models of ours at 192px. Alone: board 0.926.
 
-Together: **0.938**. The v1 arm is worth **+0.006**, which matters below.
+**Both of those numbers are back to five members and the scalar 0.50 after two
+pre-registered reverts fired** (E111 and E116, §9b). The banked 0.940 is
+unaffected — the board keeps a team's best — so the reverts cost nothing and buy
+a manifest that does not claim more than it has shown.
 
 Everything mounted is CC0. The licence audit is E043/E088/E100.
+
+---
+
+## 2b. Can you submit for us? Almost certainly not usefully — here is why
+
+**If you are already on our Kaggle team**, you share the same 5/day. You add no
+submissions at all, and we are not using the ones we have.
+
+**If you are on a separate team**, your submissions score *your* leaderboard, not
+ours, until a merge — and Kaggle caps a merged team's combined submission count,
+so submitting speculatively before merging can cost us the ability to merge at
+all. **Merge deadline is 2026-10-15.** Please do not burn submissions on a
+separate team on our behalf without checking that cap first.
+
+**What you can actually add is GPU.** Your weekly quota is a separate ~30 h from
+ours, and ours is the binding constraint right now: **3.40 h left until 19 Sep,
+and the one job that is ready to run needs ~3.5 h.** §7 says what to run.
 
 ---
 
@@ -149,82 +187,60 @@ Gold-58 would have congratulated us the whole way into a worse submission.
 
 ---
 
-## 6. What is open right now — E109, running as you read this
+## 6. What was open here is closed — E109 landed, and §7 supersedes this
 
-`PATH.md` §1 says *"architecture, every attempt: 0.000"*, and that line governs
-how every GPU hour here gets spent. **Every experiment behind it ran on or before
-2026-08-19** — and then E041/E044 changed the labels for **+0.1067 on gold**.
+**This section described E109 as in flight on 2026-09-15. It has since landed and
+four more experiments have run on top of it (E114–E117).** Rather than rewrite a
+section whose conclusions moved, the live picture is **§1** for where we stand and
+**§7** for what to do; `docs/EXPERIMENTS.md` from E117 backwards is the record.
 
-So the claim was measured under labels costing 0.107 of macro AUC, which is
-**three times E060's own ±0.03 noise floor**. An architecture effect could not
-have been seen through that. And E020's own entry disowns itself: *"0.6878 is not
-a measurement of this backbone; it is where the clock stopped."*
-
-**Three arms, fold 0, ~4 GPU-h:**
-
-| kernel | backbone | input_norm | seed |
-|---|---|---|---|
-| `knee-train-v1pub` (exists) | resnet34 | False | — |
-| `knee-train-v1pub-norm` | resnet34 | **True** | 3 |
-| `knee-train-v1pub-cnx` | **convnext_tiny** | True | 3 |
-
-The third arm exists because convnext needs ImageNet normalisation and our
-resnet34 baseline trained without it — comparing them directly confounds backbone
-with input scaling, which is **exactly** what E020 flagged in August and never
-separated. Backbone reads from the two normalised arms. The normalisation reading
-is seed-confounded and that is recorded up front, not discovered later.
-
-**Read it on fold 0's 882 held-out studies, not the ~12 gold ones a single fold
-carries.** That is why this probe is readable when every previous one-fold
-architecture probe was not.
-
-**Caveat stated before the result:** report labels for *two of our own models,
-same labels, same fold, different backbone* is an **untested middle case** between
-the +0.800 and +0.052 regimes above. The bias argues it cancels. It has not been
-measured for this class.
-
-**OUTCOME (2026-09-15): the primary question was NOT answered.** The convnext arm
-failed twice — CUDA OOM at batch 16, then a host `Killed` at batch 4 with no
-traceback, undiagnosed. **`convnext_tiny` does not run in this harness and I do
-not know why.** The control ran fine at batch 16 on the identical loader, so it
-is the model, not the data path.
-
-**The architecture claim is therefore still UNTESTED, not confirmed.** A failed
-run is not evidence a claim survived. If you pick this up, use **`resnet50` via
-torchvision** rather than convnext — it avoids the timm path entirely, and
-same-family means normalisation stops being a confound.
-
-**The control did settle E020's other confound**, which is worth having:
-ImageNet normalisation **hurts** this lineage by **−0.0064** on fold 0's 882
-studies, CI [−0.0113, −0.0014], P(better) = 0.006. Seed-confounded (incumbent
-`seed=None` vs control `seed=3`), so the direction is supported and the magnitude
-is not clean. It means E020's DINOv2 arm carried a measured handicap its resnet34
-arm did not.
-
-*(The convnext arm OOMed on the first attempt at batch 16 — 3 planes × 20 slices
-= 60 images per study. Refixed as batch 4 × 4 accumulation, the same effective
-16. Exactly equivalent here rather than approximately, because convnext uses
-LayerNorm, which is per-sample.)*
-
----
+The one delivered finding from E109 that is still in use: **`input_norm=False`
+measured −0.0064 on this lineage**, and every v1 member ships with it off.
 
 ## 7. If you want to spend GPU, in the order I would spend it
 
-1. **Wait for E109.** ~4 GPU-h already committed. If convnext separates, five
-   folds is the obvious follow-up and the architecture route is alive for the
-   first time.
-2. **Submit more.** We have used 22 submissions in two weeks against a 5/day
-   allowance and the board keeps our best. Anything with an argument behind it
-   should just be tested — the cost really is zero.
-3. **A genuinely stronger third arm.** The blend is two arms. Every public third
-   arm is too weak (§3). Training one at CoAtNet quality is ~20 GPU-h against a
-   project history where architecture measured zero — but §6 is exactly the
-   question of whether that history is real.
+**1. THE RESEED CONTROL. ~3.5 GPU-h, and it is the only experiment currently
+ready to run.** Retrain the sixth v1 member — the full-fit resnet50, same labels,
+same geometry, `input_norm=False` — **with a different seed**, and blend it the
+same way. E092 built the ±0.003 floor by changing nothing but the RNG seed and
+watching 0.926 become 0.923/0.921. This separates *+0.002 of member* from *+0.002
+of draw*, and it settles **E111 and the whole 2×2 in §1 at once**. We cannot run
+it: quota is 3.40 h and it needs ~3.5 h. **If you have quota, run this.**
 
-**What I would not do:** chase the +0.0076 of per-finding headroom. It is real
-and we have proven no instrument can find it — gold-58 cannot fit 12 parameters
-on 58 studies, and the only larger arbiter is anti-correlated for that
-comparison class (E106).
+**2. More v1 members, if 1 comes back positive.** Member count is the only lever
+with a measured board effect. If the sixth member survives its own reseed
+control, a seventh and eighth are the cheapest thing on the board at ~1.5 GPU-h
+each for resnet34.
+
+**3. Rubric-aligned ordinal labels.** The one remaining structural idea. The
+state ladder in `src/report_schema.py` is already ordinal and well built —
+`absent / not_mentioned / equivocal / minimal / mild / moderate / severe` with
+masked loss on silence — so the work is aligning `STATE_SCORE` to the
+competition's own grading definitions, not inventing grading. LLM pass over 4,407
+reports (no GPU), then a retrain (GPU).
+
+**WHAT I WOULD NOT DO, and each of these is now a measurement rather than a
+hunch:**
+
+- **Do not mount more of `dreaddevelopment`'s bench (E117).** We screened six of
+  the eleven untested CC0 checkpoints for 0.56 GPU-h. **Every one lands below
+  every incumbent** — 0.9058 down to 0.8842 against 0.9116–0.9198 — and both
+  weightings that can be justified without selection *lose*: all six at 0.25
+  scores −0.0040, all six at 0.10 scores −0.0009 with CI [−0.0068, +0.0048].
+- **Do not "just pick the good one" from that screen.** Added one at a time all
+  six gain, +0.0007 to +0.0020. **That is the maximum of six draws from noise on
+  58 studies with a ±0.006 paired interval**, and picking it is selecting on the
+  test set — which is precisely E106's failure, later traced by E113 to reading
+  memorisation. I left all six out on purpose.
+- **Do not chase per-finding blend weights (E116).** We built a version that
+  touches neither gold-58 nor CoAtNet's predictions, worth +0.0023 on held-out
+  gold at P(better) 0.897, recovering 72% of the loss E105's oracle found on MCL.
+  **The board returned 0.940 — exactly what the scalar returns.** The derivation
+  is sound and shelved by a measurement; `one_sided_weights` is kept in
+  `eda/per_finding_weights.py` with tests so it can be reinstated in one line.
+- **Do not chase synovitis (E115).** It is a **label ceiling**, measured: our
+  labels score 0.790 on it against our model's 0.779. Fracture is the control —
+  labels 0.793, model 0.885. No public label set beats ours on synovitis.
 
 ---
 
@@ -262,23 +278,26 @@ measured before you use it.
 
 ---
 
-## 9b. In flight right now (E111)
+## 9b. E111 and E116 both resolved, and both reverted on their own rules
 
-The blend's v1 half is being taken from five full-fit resnet34 to **six**, the
-extra one a full-fit **resnet50** — same labels, same geometry, different depth.
+**E111** took the v1 half from five full-fit resnet34 to six, the extra a full-fit
+resnet50. Board: **0.938 → 0.940**, the best score this project has recorded. Its
+own pre-registration said 0.936–0.940 is inside the ±0.003 floor and the rule is
+**revert to five**. It has been reverted.
 
-It ships **without an offline number and cannot have one**: a full-fit model
-trains on all 58 gold, so its gold score is memorisation. The justification is
-narrow — the board keeps our best submission and 0.938 is banked, so being wrong
-costs one click. It is not a general licence to ship blind.
+**E116** replaced the scalar blend weight with one weight per finding, derived
+without touching gold-58 or CoAtNet. Board: **0.940 — the same number**, not a
+worse one. Middle bracket, rule was revert. **Reverted.**
 
-`input_norm=False` on that arm is **E109's one delivered finding being used**:
-normalisation measured −0.0064 on this lineage.
+**The E111 revert was deliberately held back until E116 resolved**, because
+firing it earlier would have made that submission a two-variable change against
+the standing 0.940 with no way to read which half moved the board. Both fired
+together once the number landed.
 
-Expect the middle bracket. E064 priced extra same-lineage members at +0.001, and
-a depth change is more than a reseed and less than a new family. If the board
-reads 0.936–0.940 the correct move is **revert to five**, because five needs no
-justification.
+**Neither rule was renegotiated after seeing the result**, and that is the part
+worth copying. The banked 0.940 stands whatever the manifest says next, so the
+reverts cost nothing — and keeping a change the instrument cannot resolve is how
+E083 cost a board point.
 
 ---
 
