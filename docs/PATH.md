@@ -1,13 +1,33 @@
 # What is left, what it is worth, and what 0.95 actually requires
 
-Standing: **0.926 on the leaderboard** (2026-09-07, E083 — five full-fit
-members), up from 0.924, 0.923, 0.846 and 0.725.
-Leaderboard top **0.954**. **3,332 teams.** Final submission **2026-10-22**.
+Standing: **0.940 on the leaderboard** (2026-09-16, `knee-infer-raptorv1` — the
+four CC0 CoAtNet arms blended with this project's own resnet34 lineage),
+previously 0.938 (E105), 0.932 (E097), 0.928, 0.926, 0.924, 0.923, 0.846, 0.725.
 
-**Rank ~1,166 of 3,332, measured 2026-09-08 11:05 UTC (E088)** — 1,104 of 3,263
-a day earlier (E085), #866 of 1,866 on 2026-09-02 (E070). The field grew 75% in
-five days and 69 teams overnight. **A rank is a measurement with a date on it**,
-and this one decays whether or not the score moves.
+**0.940 has now been reached by two different configurations and 0.938 by two
+others, which makes a 2x2 out of four submissions**: five members scored 0.938 at
+blend 0.40 (E107) and at 0.50; six members scored 0.940 at 0.50 (E111) and at
+E116's per-finding vector averaging 0.43. **Member count moved the board +0.002
+twice; blend weight moved it 0.000 twice.** Both +0.002 results sit inside the
+±0.003 reseed floor (E092), so **the shipped config is back to five members and
+the scalar 0.50** per E111's and E116's own pre-registered rules. The 0.940 stays
+banked regardless — the board keeps a team's best. **A reseed control on the
+sixth member is the one experiment that would settle it, and it is GPU-blocked.**
+Leaderboard top **0.957**. **3,769 teams.** Final submission **2026-10-22**.
+
+**Rank 798 of 3,769, measured 2026-09-15 07:10 UTC** — **760 of 3,723 the day
+before, on the same score.** 46 teams joined overnight and passed us. Earlier:
+~1,166 of 3,332 (E088, 2026-09-08), 1,104 of 3,263 (E085), 866 of 1,866 (E070).
+**A rank is a measurement with a date on it**, and this one decays whether or not
+the score moves.
+
+**The wall above is dense and then it is not.** 837 teams at ≥0.938, 706 at
+≥0.940, 537 at ≥0.941 — but only **81 at ≥0.945**. ~720 teams live inside 0.007
+of AUC above us; the cliff is at about 0.943.
+
+**New to this repo? Read `COMMENTS_FOR_MARTIJN.md` at the root first**, then
+`docs/EXPERIMENTS.md` backwards from E109. Those two are current. Everything
+else in `docs/` is older than the standing score.
 
 **461 teams sit at exactly 0.936 and 165 at exactly 0.939**, forks of public
 notebooks, so the free public baseline is 0.010+ ahead of this project's
@@ -16,10 +36,39 @@ this file claimed for a week — corrected in §2.0.** And §4 now answers the 0
 question with the field's own shape: **the best available fork lands at 0.939**,
 so 0.95 is not a gap that acquiring anything closes.
 
-Last rewritten 2026-09-08 (E088). If this header ever reads more than a week
-old, distrust the priorities below before distrusting the numbers.
+Header refreshed 2026-09-15. **The PRIORITIES below it were written 2026-09-08
+and nine of their routes have since closed on measurements** (E098-E108) — the
+scoreboard numbers above are current, §2's plan is not. `COMMENTS_FOR_MARTIJN.md`
+§3 lists what is dead and why. If this header ever reads more than a week old,
+distrust the priorities below before distrusting the numbers.
 
 ---
+
+
+**RULE ADDED 2026-09-14 (E106): the report labels may TRAIN a model and may not
+RANK one.** Asked to choose a blend weight between the CoAtNet arm and this
+project's v1 arm, the report-label arbiter's optimum was to **delete the v1 arm
+entirely** — the arm measured at **+0.006 on the board**. Its per-finding
+preferences correlate **+0.052** with what the 58 expert studies want, i.e. not
+at all. The mechanism is that the public arms were themselves trained toward
+LLM-parsed report labels, so scoring them on report labels rewards agreement with
+what they were fitted to, and the v1 arm earns its gain exactly where it departs
+from that consensus. **No model-selection decision here may use report labels as
+the judge ACROSS ARCHITECTURES, at any number of parameters.** Training on them
+remains correct and remains this project's largest single gain (E044, +0.1067).
+
+**SUPERSEDED BY E113 (2026-09-16): the narrowing below rests on an arbiter that is IN-SAMPLE for the CoAtNet arm, so its +0.800 may be two contaminated instruments agreeing. For any comparison involving CoAtNet, the BOARD is the only clean instrument.**
+
+**NARROWED 2026-09-14 (E108), and the first version of this rule was too broad.**
+It said "no model-selection decision", full stop, which over-generalises its own
+evidence. E106's mechanism is that the proxy rewards a model for agreeing with
+the labels it was TRAINED on — a bias *between* models trained differently, and
+**common-mode between two inference geometries of the SAME checkpoint**, where it
+cancels. Measured: ranking the four published CoAtNet arms, the proxy agrees with
+gold-58 at **Spearman +0.800**, against **+0.052** for the cross-architecture
+weight vectors E106 measured. **Within a checkpoint family the proxy is a usable
+judge carrying 75× gold-58's sample; across families it is worse than useless.**
+The rule is a boundary, not a blanket.
 
 ## 1. The one number that governs the plan
 
@@ -31,9 +80,16 @@ model (0.725) to now (0.926):
 | this project's own fused labels | **+0.089** |
 | public CC0 report labels | **+0.077** |
 | ensembling, one fold → five | **+0.032** |
-| **full fit, at full weight (E083)** | **+0.003** |
+| ~~full fit, at full weight (E083)~~ | **0.000 — inside the board's own seed floor (E092)** |
 | **a distilled teacher (E083)** | **−0.013** |
-| **architecture, every attempt** | **0.000** |
+| **architecture, every attempt** | **0.000 — but measured on or before 2026-08-19, under labels worth −0.1067 (E109). STALE: retest attempted 2026-09-15 and BLOCKED, the convnext arm failed twice. Untested, not confirmed.** |
+
+**CORRECTED 2026-09-10 (E092): full fit's +0.003 does not survive.** A pure
+reseed of the same five-member full-weight ensemble — seeds 11-15 against 3-7,
+nothing else changed — scored 0.923/0.921 against 0.926, so **the board's
+like-for-like reseed spread is about 0.003 and the full-fit "lever" is the same
+size as a draw.** Every board difference in this log under 0.003 is noise,
+E064's +0.001 included.
 
 **Labels and data are +0.166 of the +0.201.** Architecture has contributed zero
 every time it has been measured, across 288px, DINOv2 twice, focal top-k,
@@ -77,8 +133,18 @@ its middle tier reads *"non-commercial matches this competition's own CC-BY-NC
 4.0 winner licence, so NC is not the obstacle it first looked like; ShareAlike on
 derivatives is the part to read before shipping."* Its avoid-tier is
 **`not-declared`**. A "read this before shipping" had hardened into an
-"excluded", on the largest measured gap in the project. **The ShareAlike question
-is unanswered, not settled** — and answering it is free.
+"excluded", on the largest measured gap in the project.
+
+**ANSWERED BY E100 (2026-09-11), and E043 had the wrong clause.** ShareAlike is
+**not** the obstacle: CC BY-NC-SA 4.0 §3(b) is conditional on Sharing *Adapted
+Material*, and running inference from a mounted checkpoint neither adapts the
+weights nor redistributes them. The clause that does bite is **§2(a)(1),
+NonCommercial** — E043 waved it past with *"NC matches this competition's own
+winner licence"*, which is a non sequitur: what the winner grants says nothing
+about whether entering for a prize is a non-commercial use. **And it is moot
+anyway**: that arm's own published OOF scores 0.8576 on gold-58 against the
+CoAtNet arm's 0.9214, a 0.0638 gap, which is the band where E098 measured six
+blends out of six negative.
 
 What *is* cleanly excluded, and on the merits rather than the label:
 `tonylica/rsna-knee-bend-dinov3-0917-repro-assets`, which gates the 0.937
@@ -308,7 +374,9 @@ should be asked for the coefficient and the interval it was measured with.**
 - **0.936–0.939 is commodity, and it is where the licence question actually
   bites.** It is 28% of the field. Reaching it means using public assets, and
   §2.0 now records that E043 excludes fewer of them than this file claimed for a
-  week. **The unanswered question is ShareAlike, and answering it costs a read.**
+  week. **E100 read it: ShareAlike does not bite, NonCommercial might, and the
+  arm is 0.0638 behind the CoAtNet column — the band E098 measured six negative
+  blends in. Closed on arithmetic before the licence decision was needed.**
 - **0.940+ needs something nobody has published.** There is no measured
   mechanism in this log, and §1's decomposition says why: labels and data
   contributed +0.166 of the +0.201 and are spent, ensembling is closed by E064,
